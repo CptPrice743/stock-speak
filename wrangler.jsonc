@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "stock-speak",
+  "main": "worker/index.ts",
+  "compatibility_date": "2025-11-01",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "STOCK_SPEAK_KV",
+      "id": "00000000000000000000000000000000"
+    }
+  ]
+}

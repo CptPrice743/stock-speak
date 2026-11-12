@@ -1,0 +1,6 @@
+# Copy this file to .dev.vars for local testing with `npm run dev`
+# In production, set these using `npx wrangler secret put <NAME>`
+
+GEMINI_API_KEY=your-google-ai-studio-api-key
+DADA_DEVICE_SECRET=change-this-to-a-long-random-secret
+ADMIN_PIN=482910
