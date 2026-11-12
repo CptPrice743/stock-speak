@@ -241,6 +241,12 @@ body {
   color: #000000;
 }
 
+.btn-ai.btn-ai-working {
+  background: #ffd600;
+  color: #000000;
+  border-color: #00e5ff;
+}
+
 .caregiver-footer-link {
   margin-top: 12px;
   text-align: center;

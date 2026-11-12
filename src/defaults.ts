@@ -62,9 +62,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   pauseBetweenStocksMs: 1200,
   ttsEngine: 'auto',
   enableGeminiAssistant: true,
-  geminiModel: 'models/gemini-3.8-live-extended-thinking',
+  geminiModel: 'models/gemini-3.8-live',
   geminiVoiceName: 'Aoede',
   requireRemoveConfirmation: true,
-  geminiSilenceTimeoutSec: 30,
+  geminiSilenceTimeoutSec: 60,
   updatedAt: '2026-11-12T00:00:00.000Z',
 };

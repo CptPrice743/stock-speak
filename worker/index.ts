@@ -1,4 +1,5 @@
 import { DEFAULT_CONFIG, DEFAULT_WATCHLIST } from '../src/defaults';
+import { normalizeStockSearchQuery } from '../src/indic-stocks';
 import type { AppConfig, QuoteData, SearchMatch, StockItem } from '../src/types';
 
 export interface Env {
@@ -101,6 +102,10 @@ async function readStateFromKV(env: Env): Promise<{ watchlist: StockItem[]; conf
     writes.push(env.STOCK_SPEAK_KV.put(KV_CONFIG_KEY, JSON.stringify(config)));
   } else {
     config = { ...DEFAULT_CONFIG, ...config };
+    if (config.geminiModel === 'models/gemini-3.8-live-extended-thinking') {
+      config.geminiModel = 'models/gemini-3.8-live';
+      writes.push(env.STOCK_SPEAK_KV.put(KV_CONFIG_KEY, JSON.stringify(config)));
+    }
   }
 
   if (writes.length > 0) {
@@ -358,10 +363,11 @@ export default {
       if (isRateLimited(`search:${clientIp}`, 30, 60_000)) {
         return jsonResponse({ error: 'Search rate limit exceeded' }, 429);
       }
-      const q = (url.searchParams.get('q') ?? '').trim();
-      if (q.length < 2 || q.length > 50) {
+      const rawQ = (url.searchParams.get('q') ?? '').trim();
+      if (rawQ.length < 2 || rawQ.length > 60) {
         return jsonResponse({ matches: [] });
       }
+      const q = normalizeStockSearchQuery(rawQ);
 
       const searchUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=15&newsCount=0`;
       const resp = await fetch(searchUrl, {

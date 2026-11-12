@@ -108,3 +108,39 @@
 - **Context**: User requested reverting/keeping the project name as `stock-speak` across the codebase, docs, and Cloudflare deployment.
 - **Decision**: Rename the application, Cloudflare Worker, KV binding (`STOCK_SPEAK_KV`), and PWA title back to **Stock-Speak (`stock-speak`)**.
 - **Consequences**: Supersedes `ADR-001`. All configs, manifests, and docs use `stock-speak` / `Stock-Speak`.
+
+---
+
+## ADR-011: English Stock Display Names
+- **Date**: 2026-11-12
+- **Status**: Accepted
+- **Context**: Maintaining custom Gujarati/Hindi display translations for every stock added via search or voice is unnecessary overhead.
+- **Decision**: Display all stock names on `/` and in `/admin` in **English (`nameEn`)**, with a single English display name field per stock in `/admin`.
+- **Consequences**: Simpler watchlist management and zero manual translation burden when adding new stocks.
+
+---
+
+## ADR-012: Gemini Live On-Demand Live Price Lookup Tool (`get_live_stock_price`)
+- **Date**: 2026-11-12
+- **Status**: Accepted
+- **Context**: Dada may ask Gemini Live for the current price of any Indian stock (even ones not on his watchlist). Allowing Gemini to guess from memory would risk hallucinations.
+- **Decision**: Add a strict `get_live_stock_price` tool in `src/gemini-live.ts` that resolves the ticker via `/api/search`, fetches the exact real-time NSE/BSE quote via `/api/quotes`, and returns verified numbers for Gemini to speak in Gujarati or Hindi.
+- **Consequences**: Dada can ask for any stock's live price conversationally without hallucinated numbers.
+
+---
+
+## ADR-013: 100% Conversational Voice Confirmation for Stock Removal
+- **Date**: 2026-11-12
+- **Status**: Accepted
+- **Context**: Dada has severe vision loss and cannot read the screen or see modal buttons. Displaying an on-screen dialog asking him to press Green YES / Red NO breaks the accessibility and voice-first experience.
+- **Decision**: Remove on-screen modal dialogs from the voice flow. Stock removal is handled 100% conversationally through Gemini Live: Gemini Live verbally asks Dada for confirmation (*"દાદા, શું તમે સાચે જ [Stock] તમારા લિસ્ટમાંથી કાઢી નાખવા માંગો છો? હા કે ના બોલો"*), listens for his verbal reply, and either removes the stock upon verbal affirmation ("હા" / "yes") or keeps it upon rejection ("ના" / "no") with warm spoken confirmation.
+- **Consequences**: Zero screen dependency for Dada; complete voice autonomy for visually impaired users.
+
+---
+
+## ADR-014: Native Gemini Live (`models/gemini-3.8-live`) & Removal of Synthetic Script/Chime Bridges
+- **Date**: 2026-11-12
+- **Status**: Accepted
+- **Context**: Attempting to force `gemini-3.8-live-extended-thinking` with synthetic text-turn injections, repeating 1.8-second chimes, and browser TTS fallbacks caused chaos: robotic hardcoded phrases, audio feedback loops, double-speaking, and WebSocket socket reset errors.
+- **Decision**: Use `models/gemini-3.8-live` as the default model. It natively handles real-time audio-to-audio dialogue and dispatches tools (`get_live_stock_price`, `add_stock_to_watchlist`, `remove_stock_from_watchlist`) in <1 second. Strip out repeating chimes, hardcoded script injection prompts, and browser TTS fallbacks. Mute mic during model audio playback to prevent acoustic echo loops.
+- **Consequences**: Restores warm, human, unscripted conversational flow where decisions and price lookups happen naturally through dialogue.

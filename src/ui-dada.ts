@@ -48,10 +48,9 @@ export function mountDadaApp(root: HTMLElement): void {
   let tapGeneration = 0;
   let needsAuth = !getDadaKey() && !getAdminPin();
   let statusBanner = '';
-  let geminiStatus: 'idle' | 'connecting' | 'listening' | 'speaking' | 'error' = 'idle';
+  let geminiStatus: 'idle' | 'connecting' | 'listening' | 'working' | 'speaking' | 'error' = 'idle';
+  let geminiWorkingDetail = '';
   let geminiError = '';
-  let pendingConfirmResolve: ((ok: boolean) => void) | null = null;
-  let pendingConfirmStock: StockItem | null = null;
 
   const speech = new SpeechController();
   let gemini: GeminiLiveController | null = null;
@@ -82,42 +81,6 @@ export function mountDadaApp(root: HTMLElement): void {
             : 'भाव लाने में समस्या है। फिर प्रयास करें।';
         render();
       }
-    }
-  }
-
-  function showRemoveConfirmDialog(stock: StockItem): Promise<boolean> {
-    pendingConfirmStock = stock;
-    render();
-    const dialog = root.querySelector<HTMLDialogElement>('#confirm-remove-dialog');
-    if (!dialog) return Promise.resolve(false);
-    if (!dialog.open) {
-      dialog.showModal();
-    }
-    return new Promise((resolve) => {
-      pendingConfirmResolve = resolve;
-      const onClose = () => {
-        dialog.removeEventListener('close', onClose);
-        const choice = dialog.returnValue;
-        dialog.returnValue = '';
-        pendingConfirmStock = null;
-        const r = pendingConfirmResolve;
-        pendingConfirmResolve = null;
-        r?.(choice === 'yes');
-        render();
-      };
-      dialog.addEventListener('close', onClose);
-    });
-  }
-
-  function resolveConfirmDialogIfOpen(result: boolean): void {
-    const dialog = root.querySelector<HTMLDialogElement>('#confirm-remove-dialog');
-    if (dialog && dialog.open) {
-      dialog.close(result ? 'yes' : 'no');
-    } else if (pendingConfirmResolve) {
-      const r = pendingConfirmResolve;
-      pendingConfirmResolve = null;
-      pendingConfirmStock = null;
-      r(result);
     }
   }
 
@@ -226,6 +189,7 @@ export function mountDadaApp(root: HTMLElement): void {
     geminiError = '';
     await gemini.start(state.config, lang(), {
       getWatchlist: () => state.watchlist,
+      getQuotes: () => quotes,
       onAddStock: async (newStock) => {
         if (state.watchlist.some((s) => s.symbol === newStock.symbol)) return;
         const nextList = [...state.watchlist, newStock];
@@ -233,11 +197,9 @@ export function mountDadaApp(root: HTMLElement): void {
         render();
         void ensureFreshQuotes(true);
       },
-      onRequestRemoveStock: (stock) => showRemoveConfirmDialog(stock),
       onRemoveStockConfirmed: async (symbol) => {
-        resolveConfirmDialogIfOpen(false);
         const filtered = state.watchlist.filter((s) => s.symbol !== symbol);
-        if (filtered.length > 0 && filtered.length !== state.watchlist.length) {
+        if (filtered.length !== state.watchlist.length) {
           state = await updateWatchlistRemote(filtered);
           render();
         }
@@ -245,11 +207,14 @@ export function mountDadaApp(root: HTMLElement): void {
       onStatusChange: (status, detail) => {
         if (status === 'closed') {
           geminiStatus = 'idle';
+          geminiWorkingDetail = '';
         } else if (status === 'error') {
           geminiStatus = 'error';
+          geminiWorkingDetail = '';
           geminiError = detail || 'AI Error';
         } else {
           geminiStatus = status;
+          geminiWorkingDetail = status === 'working' && detail ? detail : '';
         }
         render();
       },
@@ -327,22 +292,25 @@ export function mountDadaApp(root: HTMLElement): void {
         ? curLang === 'gu'
           ? '⏳ જોડાય છે...'
           : '⏳ जुड़ रहा है...'
-        : geminiStatus === 'listening'
-          ? curLang === 'gu'
-            ? '🎙️ બોલો દાદા... (રોકવા દબાવો)'
-            : '🎙️ बोलें दादाजी... (रोकने दबाएं)'
-          : geminiStatus === 'speaking'
+        : geminiStatus === 'working'
+          ? geminiWorkingDetail ||
+            (curLang === 'gu' ? '⏳ શોધું છું...' : '⏳ ढूँढ रहा हूँ...')
+          : geminiStatus === 'listening'
             ? curLang === 'gu'
-              ? '🗣️ સાંભળો... (રોકવા દબાવો)'
-              : '🗣️ सुनें... (रोकने दबाएं)'
-            : curLang === 'gu'
-              ? '🎙️ નવો શેર ઉમેરો / કાઢો'
-              : '🎙️ नया शेयर जोड़ें / हटाएं';
+              ? '🎙️ બોલો દાદા... (રોકવા દબાવો)'
+              : '🎙️ बोलें दादाजी... (रोकने दबाएं)'
+            : geminiStatus === 'speaking'
+              ? curLang === 'gu'
+                ? '🗣️ સાંભળો... (રોકવા દબાવો)'
+                : '🗣️ सुनें... (रोकने दबाएं)'
+              : curLang === 'gu'
+                ? '🎙️ નવો શેર ઉમેરો / કાઢો'
+                : '🎙️ नया शेयर जोड़ें / हटाएं';
 
     const cardsHtml = state.watchlist
       .map((stock) => {
         const q = quotes[stock.symbol];
-        const displayName = curLang === 'gu' ? stock.nameGu : stock.nameHi;
+        const displayName = stock.nameEn;
         const shortTicker = stock.symbol.replace(/\.(NS|BO)$/, '');
         const isSpeakingThis = speakingSymbol === stock.symbol;
 
@@ -400,15 +368,6 @@ export function mountDadaApp(root: HTMLElement): void {
       })
       .join('');
 
-    const confirmTitle = pendingConfirmStock
-      ? curLang === 'gu'
-        ? `${pendingConfirmStock.nameGu} કાઢી નાખવો છે?`
-        : `${pendingConfirmStock.nameHi} हटाना है?`
-      : '';
-
-    const yesLabel = curLang === 'gu' ? '✅ હા, કાઢી નાખો (YES)' : '✅ हाँ, हटाएं (YES)';
-    const noLabel = curLang === 'gu' ? '❌ ના, રહેવા દો (NO)' : '❌ नहीं, रहने दें (NO)';
-
     root.innerHTML = `
       <div class="dada-shell">
         <header class="dada-header">
@@ -445,21 +404,13 @@ export function mountDadaApp(root: HTMLElement): void {
                  <button
                    type="button"
                    id="btn-ai-assistant"
-                   class="btn-ai ${geminiStatus !== 'idle' && geminiStatus !== 'error' ? 'btn-ai-active' : ''}"
+                   class="btn-ai ${geminiStatus === 'working' ? 'btn-ai-working' : geminiStatus !== 'idle' && geminiStatus !== 'error' ? 'btn-ai-active' : ''}"
                  >
                    ${aiLabel}
                  </button>
                </footer>`
             : ''
         }
-
-        <dialog id="confirm-remove-dialog" class="confirm-dialog" aria-labelledby="confirm-remove-title">
-          <h1 id="confirm-remove-title" class="confirm-title">${confirmTitle}</h1>
-          <form method="dialog" class="confirm-actions">
-            <button type="submit" value="yes" class="confirm-yes">${yesLabel}</button>
-            <button type="submit" value="no" class="confirm-no" autofocus>${noLabel}</button>
-          </form>
-        </dialog>
       </div>
     `;
 
@@ -478,11 +429,6 @@ export function mountDadaApp(root: HTMLElement): void {
         if (found) void handleSpeakCard(found);
       });
     });
-
-    if (pendingConfirmStock) {
-      const dlg = root.querySelector<HTMLDialogElement>('#confirm-remove-dialog');
-      if (dlg && !dlg.open) dlg.showModal();
-    }
   }
 
   async function bootSync(): Promise<void> {

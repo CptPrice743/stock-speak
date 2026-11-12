@@ -122,12 +122,8 @@ export function mountAdminApp(root: HTMLElement): void {
           </div>
           <div class="wl-inputs">
             <div class="field-group">
-              <label for="gu-${idx}">Gujarati Name (spoken)</label>
-              <input id="gu-${idx}" type="text" class="wl-name-gu" data-idx="${idx}" value="${escapeHtml(s.nameGu)}" />
-            </div>
-            <div class="field-group">
-              <label for="hi-${idx}">Hindi Name (spoken)</label>
-              <input id="hi-${idx}" type="text" class="wl-name-hi" data-idx="${idx}" value="${escapeHtml(s.nameHi)}" />
+              <label for="en-${idx}">Display Name (English)</label>
+              <input id="en-${idx}" type="text" class="wl-name-en" data-idx="${idx}" value="${escapeHtml(s.nameEn)}" />
             </div>
           </div>
         </li>
@@ -200,10 +196,10 @@ export function mountAdminApp(root: HTMLElement): void {
 
           <section class="admin-card">
             <div class="card-title-row">
-              <h2>3. Watchlist Order & Pronunciation (${watchlist.length}/25)</h2>
+              <h2>3. Watchlist Order & Display Names (${watchlist.length}/25)</h2>
               <button type="button" id="btn-reset-defaults" class="admin-btn-danger">Restore Blue-Chips</button>
             </div>
-            <p class="admin-muted">Tweak Gujarati or Hindi spelling if the phone's voice mispronounces a company name.</p>
+            <p class="admin-muted">Reorder stocks or customize their English display names.</p>
             <ul class="wl-list">
               ${watchlistRows}
             </ul>
@@ -287,10 +283,10 @@ export function mountAdminApp(root: HTMLElement): void {
                 required
               />
               <datalist id="gemini-model-presets">
-                <option value="models/gemini-3.8-live-extended-thinking"></option>
                 <option value="models/gemini-3.8-live"></option>
+                <option value="models/gemini-3.8-live-extended-thinking"></option>
                 <option value="models/gemini-3.1-flash-live-preview"></option>
-                <option value="models/gemini-2.5-flash-native-audio-preview-12-2025"></option>
+                <option value="models/gemini-2.5-flash-native-audio-latest"></option>
               </datalist>
             </div>
 
@@ -305,7 +301,7 @@ export function mountAdminApp(root: HTMLElement): void {
 
             <div class="checkbox-row">
               <input type="checkbox" id="cfg-confirm-remove" ${config.requireRemoveConfirmation ? 'checked' : ''} />
-              <label for="cfg-confirm-remove">Require Giant Green/Red confirmation screen before removing a stock</label>
+              <label for="cfg-confirm-remove">Ask Dada verbal voice confirmation before removing a stock via AI</label>
             </div>
 
             <div class="field-group">
@@ -325,13 +321,16 @@ export function mountAdminApp(root: HTMLElement): void {
   }
 
   function syncWatchlistInputsFromDom(): void {
-    root.querySelectorAll<HTMLInputElement>('.wl-name-gu').forEach((inp) => {
+    root.querySelectorAll<HTMLInputElement>('.wl-name-en').forEach((inp) => {
       const idx = Number(inp.dataset.idx);
-      if (watchlist[idx]) watchlist[idx].nameGu = inp.value.trim() || watchlist[idx].nameEn;
-    });
-    root.querySelectorAll<HTMLInputElement>('.wl-name-hi').forEach((inp) => {
-      const idx = Number(inp.dataset.idx);
-      if (watchlist[idx]) watchlist[idx].nameHi = inp.value.trim() || watchlist[idx].nameEn;
+      const item = watchlist[idx];
+      if (!item) return;
+      const nextEn = inp.value.trim() || item.symbol;
+      if (nextEn !== item.nameEn) {
+        item.nameEn = nextEn;
+        item.nameGu = nextEn;
+        item.nameHi = nextEn;
+      }
     });
   }
 
