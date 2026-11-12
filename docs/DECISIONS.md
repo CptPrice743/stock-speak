@@ -144,3 +144,12 @@
 - **Context**: Attempting to force `gemini-3.8-live-extended-thinking` with synthetic text-turn injections, repeating 1.8-second chimes, and browser TTS fallbacks caused chaos: robotic hardcoded phrases, audio feedback loops, double-speaking, and WebSocket socket reset errors.
 - **Decision**: Use `models/gemini-3.8-live` as the default model. It natively handles real-time audio-to-audio dialogue and dispatches tools (`get_live_stock_price`, `add_stock_to_watchlist`, `remove_stock_from_watchlist`) in <1 second. Strip out repeating chimes, hardcoded script injection prompts, and browser TTS fallbacks. Mute mic during model audio playback to prevent acoustic echo loops.
 - **Consequences**: Restores warm, human, unscripted conversational flow where decisions and price lookups happen naturally through dialogue.
+
+---
+
+## ADR-015: Two Full-Screen Action Buttons on Dada View (No Watchlist Cards)
+- **Date**: 2026-11-12
+- **Status**: Accepted
+- **Context**: Dada has severe vision loss and cannot read individual stock cards on screen. Rendering the watchlist on `/` added visual clutter and took screen space away from the two primary voice controls.
+- **Decision**: Remove the stock watchlist cards from `/` (`src/ui-dada.ts`) and expand `#btn-speak-all` and `#btn-ai-assistant` (`flex: 1` each inside `.dada-big-buttons`) to fill the entire viewport. Keep `state.watchlist` and quote syncing in the backend, Dada's audio state, and the `/admin` portal.
+- **Consequences**: Supersedes the card-based layout in `ADR-004`. Dada has two unmistakable half-screen touch targets while caregivers still manage the watchlist in `/admin`.

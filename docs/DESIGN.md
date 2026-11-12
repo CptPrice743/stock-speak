@@ -55,43 +55,32 @@ All colors are tested against pure `#000000` for maximum luminance contrast:
 
 ```text
 +---------------------------------------------------+
-| [ 🔊 બધા ભાવ બોલો (SPEAK ALL) ]      [ ગુજરાતી / हिंदी ] |
-|   Solid #FFD600 Yellow Fill, #000000 Text, 120px  |
+| [             ગુજરાતી → हिंदी (optional)           ] |
 +---------------------------------------------------+
 |                                                   |
-| +-----------------------------------------------+ |
-| | રિલાયન્સ (RELIANCE)                           | |
-| | ₹1,450              [ ▲ ₹15 વધ્યો (Green) ]   | |
-| +-----------------------------------------------+ |
-|   Border: 5px solid #00E676 (Green because UP)    |
 |                                                   |
-| +-----------------------------------------------+ |
-| | ટીસીએસ (TCS)                                  | |
-| | ₹3,920              [ ▼ ₹22 ઘટ્યો (Red)   ]   | |
-| +-----------------------------------------------+ |
-|   Border: 5px solid #FF5252 (Red because DOWN)    |
+|           [ 🔊 બધા ભાવ બોલો (SPEAK ALL) ]          |
+|         Solid #FFD600 Yellow Fill, flex: 1        |
 |                                                   |
-| +-----------------------------------------------+ |
-| | એચડીએફસી બેંક (HDFC)                          | |
-| | ₹1,680              [ ▲ ₹12 વધ્યો (Green) ]   | |
-| +-----------------------------------------------+ |
 |                                                   |
 +---------------------------------------------------+
-| [ 🎙️ નવો શેર ઉમેરો / કાઢો (AI ASSISTANT) ]        |
-|   Pinned Bottom Bar, Solid #00E5FF Cyan, 100px    |
+|                                                   |
+|                                                   |
+|        [ 🎙️ નવો શેર ઉમેરો / કાઢો (AI) ]           |
+|          Solid #00E5FF Cyan Fill, flex: 1         |
+|                                                   |
+|                                                   |
++---------------------------------------------------+
+|              Caregiver Portal (/admin)            |
 +---------------------------------------------------+
 ```
 
 ### 5.1 Tactile & Audio Feedback Rules
-1. **Haptic Pulse**: Every tap on any button triggers `navigator.vibrate?.(60)` immediately.
+1. **Haptic Pulse**: Every tap on any button triggers `navigator.vibrate(55)` immediately.
 2. **Active Speaking State**:
-   - While "SPEAK ALL" is running, the top yellow button changes text to **`⏹️ રોકો (STOP SPEAKING)`** with a bright `#FF5252` Red background so Dada can stop the voice at any second by tapping the top of his screen.
-   - Each card scrolls smoothly into the center of the viewport (`element.scrollIntoView({ block: 'center' })`) and gets an `8px solid #FFD600` border while its price is being spoken.
-3. **Full-Screen Removal Confirmation Overlay**:
-   - When Gemini Live proposes removing a stock (e.g., `ITC.NS`), a full-screen modal covers the viewport:
-     - **Header (`#000000` bg, `#FFFFFF` 36px text)**: *"આઈટીસી (ITC) કાઢી નાખવો છે?"*
-     - **Top Giant Button (40% screen height, `#00E676` Green)**: **"હા, કાઢી નાખો (YES)"**
-     - **Bottom Giant Button (40% screen height, `#FF5252` Red)**: **"ના, રહેવા દો (NO)"**
+   - While "SPEAK ALL" is running, the top yellow button changes text to **`⏹️ રોકો (STOP)`** with a bright `#FF5252` Red background so Dada can stop the voice at any second by tapping the top half of his screen.
+3. **100% Conversational Voice Flow**:
+   - No stock cards or on-screen confirmation modals are rendered on `/`. The watchlist remains in the backend (`/api/state` + KV) and in `/admin` for caregiver editing and for "SPEAK ALL" and Gemini Live.
 
 ---
 

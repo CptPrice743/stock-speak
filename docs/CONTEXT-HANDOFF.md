@@ -1,4 +1,4 @@
-# DadaBav (દાદાભાવ) — Session Context Handoff
+# Stock-Speak (`stock-speak`) — Session Context Handoff
 
 > [!CAUTION]
 > **STRICT RULES FOR ALL AI AGENTS (READ BEFORE TOUCHING THIS FILE)**
@@ -10,35 +10,26 @@
 ---
 
 ## 1. Current Milestone & Status
-- **Phase**: Phase 1 Complete (Architecture, Low-Vision Design System, Remote Caregiver Portal Specs, Security Model, and Documentation).
-- **Application Code Status**: Ready to begin **Phase 2 (Project Scaffolding & Implementation)** using the exact file blueprint in [ARCHITECTURE.md](./ARCHITECTURE.md).
+- **Phase**: Production Deployed & Live via GitHub -> Cloudflare Workers Builds CI/CD.
+- **Application Code Status**: All frontend (`src/`), Worker backend (`worker/index.ts`), and docs (`docs/`) are implemented, typechecked, and building cleanly (`npm run typecheck && npm run build`).
 
-## 2. What Was Just Completed
-- Created `.gitignore` tailored for Vite + Vanilla TypeScript + Cloudflare Wrangler.
-- Created `docs/AGENT.md` (`< 500` tokens) as the high-speed agent router and guardrail contract.
-- Created `docs/ARCHITECTURE.md` with full specs for the Cloudflare Worker endpoints (`/api/quotes`, `/api/search`, `/api/state`, `/api/tts`, `/api/gemini-session`), `DADABAV_KV` schemas, deterministic Gujarati/Hindi TTS formatting (rounded vs. exact paise), Gemini Live tool declarations, and magic-link security.
-- Created `docs/DESIGN.md` detailing the low-vision AAA+ color palette (`#000000`, `#FFD600`, `#00E676`, `#FF5252`, `#00E5FF`), ₹10k smartphone GPU/CPU performance rules, Dada's `/` view, and the Grandson's `/admin` Remote Caregiver Portal.
-- Created `docs/DECISIONS.md` capturing `ADR-001` through `ADR-009`.
+## 2. What Was Completed
+- **Core App & Worker**: Built full PWA + Cloudflare Worker (`worker/index.ts`) with `STOCK_SPEAK_KV`, Yahoo Finance `.NS`/`.BO` quotes/search, deterministic Gujarati/Hindi TTS (`src/speech.ts`), and `/admin` Caregiver Portal (`src/ui-admin.ts`).
+- **Gemini Live Voice Assistant (`src/gemini-live.ts`)**:
+  - Default model set to `models/gemini-3.8-live` with natural conversational flow (`ADR-014`).
+  - Added `get_live_stock_price`, `add_stock_to_watchlist`, and `remove_stock_from_watchlist` tools (`ADR-012`, `ADR-013`).
+- **Dada View Simplification (`src/ui-dada.ts`, `src/styles.css`)**:
+  - Removed visible stock watchlist cards and confirmation modals from `/`; replaced with two full-screen action buttons (`#btn-speak-all` and `#btn-ai-assistant`) while keeping watchlist state in KV and `/admin` (`ADR-015`).
+- **Cloudflare CI/CD**: Connected GitHub repo to Cloudflare Workers Builds with `STOCK_SPEAK_KV` binding ID in `wrangler.jsonc` and runtime secrets (`GEMINI_API_KEY`, `DADA_DEVICE_SECRET`, `ADMIN_PIN`) in Cloudflare **Runtime variables and secrets**.
 
 ## 3. Active Blockers / Open Issues
-- None. All product, UX, security, and architectural questions are resolved.
+- None. User is ready to commit and push the latest Dada view simplification (`src/ui-dada.ts`, `src/styles.css`, `docs/DESIGN.md`, `docs/DECISIONS.md`, `docs/CONTEXT-HANDOFF.md`) to trigger auto-deploy.
 
-## 4. Exact Next Steps for Next Session (Implementation Order)
-1. **Scaffold Project Configs**: Create `package.json`, `tsconfig.json`, `vite.config.ts`, `wrangler.jsonc` (with `DADABAV_KV` binding), and `.dev.vars.example`.
-2. **Build Cloudflare Worker Backend (`worker/index.ts`)**:
-   - Implement `X-Dada-Key` / `X-Admin-Pin` auth middleware + per-IP rate limiter.
-   - Implement `GET/PUT /api/state`, `GET /api/quotes` (Yahoo Finance v8 `.NS`/`.BO`), `GET /api/search`, `GET /api/tts` (Google Translate TTS proxy fallback), and `POST /api/gemini-session`.
-3. **Build Core Frontend Modules (`src/`)**:
-   - `src/types.ts`, `src/defaults.ts` (7 Indian blue-chip stocks with Gujarati & Hindi names + default `AppConfig`), `src/api.ts`, and `src/state.ts`.
-   - `src/speech.ts` (deterministic Gujarati/Hindi readout supporting `round`, `exact_paise`, and `smart` rounding + `/api/tts` fallback).
-4. **Build Dada's High-Contrast View (`src/ui-dada.ts` & `src/styles.css`)** + **Gemini Live Client (`src/gemini-live.ts`)** with the Giant GREEN/RED removal confirmation modal.
-5. **Build Grandson's Caregiver Portal (`src/ui-admin.ts`)** at `/admin` (remote watchlist editor, paise rounding toggle, speech speed slider, editable Gemini Live model string, and magic setup link generator).
-6. **PWA & Verification**: Add `public/manifest.webmanifest`, `public/sw.js`, run `npm run build`, and verify gzipped bundle is `< 10KB`.
+## 4. Exact Next Steps (If Resuming)
+1. If user has not pushed yet, they will commit and `git push` to `main` to trigger Cloudflare Workers auto-deploy.
+2. Any future UI/voice tweaks should preserve the zero-GPU-overhead rules in `docs/DESIGN.md` and conversational-only flow in `ADR-013` / `ADR-014`.
 
-## 5. Files Modified in Last Session
-- `.gitignore`
-- `docs/AGENT.md`
-- `docs/ARCHITECTURE.md`
-- `docs/DESIGN.md`
-- `docs/DECISIONS.md`
-- `docs/CONTEXT-HANDOFF.md`
+## 5. Key Files
+- `wrangler.jsonc`, `worker/index.ts`
+- `src/ui-dada.ts`, `src/ui-admin.ts`, `src/gemini-live.ts`, `src/speech.ts`, `src/styles.css`
+- `docs/AGENT.md`, `docs/DESIGN.md`, `docs/DECISIONS.md` (`ADR-001`–`ADR-015`), `docs/CONTEXT-HANDOFF.md`
