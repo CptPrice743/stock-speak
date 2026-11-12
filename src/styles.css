@@ -37,31 +37,46 @@ body {
 
 .dada-shell {
   min-height: 100dvh;
+  height: 100dvh;
   background: #000000;
-  padding: 12px 12px 128px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.dada-header {
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
+.dada-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.dada-big-buttons {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .btn-speak-all {
+  flex: 1;
   width: 100%;
-  min-height: 116px;
-  padding: 16px;
+  min-height: 140px;
+  padding: 20px;
   background: #ffd600;
   color: #000000;
-  border: 5px solid #ffffff;
-  border-radius: 14px;
+  border: 6px solid #ffffff;
+  border-radius: 18px;
   font: inherit;
-  font-size: 2.1rem;
+  font-size: clamp(2rem, 6vw, 2.75rem);
   font-weight: 900;
-  line-height: 1.15;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -73,14 +88,14 @@ body {
 
 .btn-lang {
   width: 100%;
-  min-height: 76px;
-  padding: 12px 16px;
+  min-height: 60px;
+  padding: 10px 16px;
   background: #141414;
   color: #ffd600;
   border: 4px solid #ffd600;
   border-radius: 12px;
   font: inherit;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
   cursor: pointer;
 }
@@ -212,27 +227,23 @@ body {
   color: #ffffff;
 }
 
-.dada-footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 10px 12px;
-  background: #000000;
-  border-top: 4px solid #333333;
-}
-
 .btn-ai {
+  flex: 1;
   width: 100%;
-  min-height: 92px;
-  padding: 12px 16px;
+  min-height: 140px;
+  padding: 20px;
   background: #00e5ff;
   color: #000000;
-  border: 5px solid #ffffff;
-  border-radius: 14px;
+  border: 6px solid #ffffff;
+  border-radius: 18px;
   font: inherit;
-  font-size: 1.65rem;
+  font-size: clamp(1.85rem, 5.5vw, 2.5rem);
   font-weight: 900;
+  line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -248,15 +259,15 @@ body {
 }
 
 .caregiver-footer-link {
-  margin-top: 12px;
+  flex-shrink: 0;
   text-align: center;
 }
 
 .caregiver-link {
   color: #888888;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   text-decoration: underline;
-  padding: 12px;
+  padding: 6px 12px;
   display: inline-block;
 }
 

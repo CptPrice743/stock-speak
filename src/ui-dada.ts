@@ -6,32 +6,14 @@ import {
   unlockDeviceWithPin,
 } from './api';
 import type { GeminiLiveController } from './gemini-live';
-import { buildStockAnnouncement, SpeechController } from './speech';
+import { SpeechController } from './speech';
 import {
   loadCachedState,
   setLocalLanguageOverride,
   syncRemoteState,
   updateWatchlistRemote,
 } from './state';
-import type { AppState, Language, QuoteData, StockItem } from './types';
-
-function formatDisplayPrice(price: number, rounding: AppState['config']['priceRounding']): string {
-  const useExact = rounding === 'exact_paise' || (rounding === 'smart' && price < 100);
-  return useExact
-    ? price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : Math.round(price).toLocaleString('en-IN');
-}
-
-function formatDisplayChange(change: number, rounding: AppState['config']['priceRounding']): string {
-  const abs = Math.abs(change);
-  const useExact =
-    rounding === 'exact_paise' ||
-    (rounding === 'smart' && abs < 100) ||
-    (abs > 0 && Math.round(abs) === 0);
-  return useExact
-    ? abs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : Math.round(abs).toLocaleString('en-IN');
-}
+import type { Language, QuoteData } from './types';
 
 function vibrateTap(): void {
   if ('vibrate' in navigator) {
@@ -43,7 +25,6 @@ export function mountDadaApp(root: HTMLElement): void {
   let state = loadCachedState();
   let quotes: Record<string, QuoteData> = {};
   let lastQuoteFetchMs = 0;
-  let speakingSymbol: string | null = null;
   let speakingAllActive = false;
   let tapGeneration = 0;
   let needsAuth = !getDadaKey() && !getAdminPin();
@@ -91,7 +72,6 @@ export function mountDadaApp(root: HTMLElement): void {
 
     if (speakingAllActive || speech.speaking) {
       speakingAllActive = false;
-      speakingSymbol = null;
       speech.stop();
       render();
       return;
@@ -107,51 +87,10 @@ export function mountDadaApp(root: HTMLElement): void {
     await ensureFreshQuotes(true);
     if (!speakingAllActive || myGen !== tapGeneration) return;
 
-    await speech.speakAll(state.watchlist, quotes, state.config, lang(), (sym) => {
-      if (myGen !== tapGeneration) return;
-      speakingSymbol = sym;
-      render();
-      if (sym) {
-        const card = root.querySelector<HTMLElement>(`[data-symbol="${CSS.escape(sym)}"]`);
-        card?.scrollIntoView({ block: 'center', behavior: 'auto' });
-      }
-    });
+    await speech.speakAll(state.watchlist, quotes, state.config, lang(), () => {});
 
     if (myGen === tapGeneration) {
       speakingAllActive = false;
-      speakingSymbol = null;
-      render();
-    }
-  }
-
-  async function handleSpeakCard(stock: StockItem): Promise<void> {
-    vibrateTap();
-    tapGeneration += 1;
-    const myGen = tapGeneration;
-
-    // Immediately cut off any previous card or SPEAK ALL voice before doing anything async
-    speech.stop();
-    speakingAllActive = false;
-
-    if (gemini?.isActive) {
-      gemini.stop();
-      geminiStatus = 'idle';
-    }
-
-    speakingSymbol = stock.symbol;
-    render();
-
-    await ensureFreshQuotes(false);
-    if (myGen !== tapGeneration || speakingAllActive) return;
-
-    const quote = quotes[stock.symbol];
-    if (quote) {
-      const text = buildStockAnnouncement(stock, quote, state.config, lang());
-      await speech.speakSingle(text, lang(), state.config);
-    }
-
-    if (myGen === tapGeneration && speakingSymbol === stock.symbol && !speakingAllActive) {
-      speakingSymbol = null;
       render();
     }
   }
@@ -160,7 +99,6 @@ export function mountDadaApp(root: HTMLElement): void {
     vibrateTap();
     speech.stop();
     speakingAllActive = false;
-    speakingSymbol = null;
     const nextLang: Language = lang() === 'gu' ? 'hi' : 'gu';
     state.config.language = nextLang;
     document.documentElement.lang = nextLang;
@@ -172,7 +110,6 @@ export function mountDadaApp(root: HTMLElement): void {
     vibrateTap();
     speech.stop();
     speakingAllActive = false;
-    speakingSymbol = null;
 
     if (!gemini) {
       const mod = await import('./gemini-live');
@@ -307,70 +244,25 @@ export function mountDadaApp(root: HTMLElement): void {
                 ? '🎙️ નવો શેર ઉમેરો / કાઢો'
                 : '🎙️ नया शेयर जोड़ें / हटाएं';
 
-    const cardsHtml = state.watchlist
-      .map((stock) => {
-        const q = quotes[stock.symbol];
-        const displayName = stock.nameEn;
-        const shortTicker = stock.symbol.replace(/\.(NS|BO)$/, '');
-        const isSpeakingThis = speakingSymbol === stock.symbol;
-
-        let borderClass = 'card-neutral';
-        let priceHtml = '<span class="card-price">...</span>';
-        let pillHtml = '<span class="card-pill pill-neutral">—</span>';
-
-        if (q) {
-          const isUp = q.change > 0.005;
-          const isDown = q.change < -0.005;
-          borderClass = isUp ? 'card-up' : isDown ? 'card-down' : 'card-neutral';
-          const priceStr = formatDisplayPrice(q.regularMarketPrice, state.config.priceRounding);
-          const changeStr = formatDisplayChange(q.change, state.config.priceRounding);
-          const dirArrow = isUp ? '▲' : isDown ? '▼' : '•';
-          const dirWord =
-            curLang === 'gu'
-              ? isUp
-                ? 'વધ્યો'
-                : isDown
-                  ? 'ઘટ્યો'
-                  : 'સ્થિર'
-              : isUp
-                ? 'बढ़ा'
-                : isDown
-                  ? 'गिरा'
-                  : 'स्थिर';
-          const pillClass = isUp ? 'pill-up' : isDown ? 'pill-down' : 'pill-neutral';
-          const pctPart =
-            state.config.announcePercentChange && (isUp || isDown)
-              ? ` (${Math.abs(q.percentChange).toFixed(1)}%)`
-              : '';
-
-          priceHtml = `<span class="card-price">₹${priceStr}</span>`;
-          pillHtml = `<span class="card-pill ${pillClass}">${dirArrow} ₹${changeStr} ${dirWord}${pctPart}</span>`;
-        }
-
-        return `
-          <li class="stock-item">
-            <button
-              type="button"
-              class="stock-card ${borderClass} ${isSpeakingThis ? 'card-speaking' : ''}"
-              data-symbol="${stock.symbol}"
-            >
-              <div class="card-top">
-                <span class="card-name">${displayName}</span>
-                <span class="card-ticker">${shortTicker}</span>
-              </div>
-              <div class="card-bottom">
-                ${priceHtml}
-                ${pillHtml}
-              </div>
-            </button>
-          </li>
-        `;
-      })
-      .join('');
-
     root.innerHTML = `
       <div class="dada-shell">
-        <header class="dada-header">
+        ${
+          state.config.showLanguageToggle || statusBanner || geminiError
+            ? `<header class="dada-header">
+                 ${
+                   state.config.showLanguageToggle
+                     ? `<button type="button" id="btn-lang-toggle" class="btn-lang" aria-label="Switch language Gujarati or Hindi">
+                          ${curLang === 'gu' ? 'ગુજરાતી → हिंदी' : 'हिंदी → ગુજરાતી'}
+                        </button>`
+                     : ''
+                 }
+                 ${statusBanner ? `<p class="status-banner" role="status">${statusBanner}</p>` : ''}
+                 ${geminiError ? `<p class="status-banner status-err" role="alert">${geminiError}</p>` : ''}
+               </header>`
+            : ''
+        }
+
+        <main class="dada-big-buttons">
           <button
             type="button"
             id="btn-speak-all"
@@ -378,39 +270,23 @@ export function mountDadaApp(root: HTMLElement): void {
           >
             ${speakBtnLabel}
           </button>
+
           ${
-            state.config.showLanguageToggle
-              ? `<button type="button" id="btn-lang-toggle" class="btn-lang" aria-label="Switch language Gujarati or Hindi">
-                   ${curLang === 'gu' ? 'ગુજરાતી → हिंदी' : 'हिंदी → ગુજરાતી'}
-                 </button>`
-              : ''
-          }
-        </header>
-
-        <main class="dada-main">
-          ${statusBanner ? `<p class="status-banner" role="status">${statusBanner}</p>` : ''}
-          ${geminiError ? `<p class="status-banner status-err" role="alert">${geminiError}</p>` : ''}
-          <ul class="stock-list" aria-label="Stock watchlist">
-            ${cardsHtml}
-          </ul>
-          <div class="caregiver-footer-link">
-            <a href="/admin" class="caregiver-link">Caregiver Portal (/admin)</a>
-          </div>
-        </main>
-
-        ${
-          state.config.enableGeminiAssistant
-            ? `<footer class="dada-footer">
-                 <button
+            state.config.enableGeminiAssistant
+              ? `<button
                    type="button"
                    id="btn-ai-assistant"
                    class="btn-ai ${geminiStatus === 'working' ? 'btn-ai-working' : geminiStatus !== 'idle' && geminiStatus !== 'error' ? 'btn-ai-active' : ''}"
                  >
                    ${aiLabel}
-                 </button>
-               </footer>`
-            : ''
-        }
+                 </button>`
+              : ''
+          }
+        </main>
+
+        <footer class="caregiver-footer-link">
+          <a href="/admin" class="caregiver-link">Caregiver Portal (/admin)</a>
+        </footer>
       </div>
     `;
 
@@ -420,14 +296,6 @@ export function mountDadaApp(root: HTMLElement): void {
     root.querySelector('#btn-lang-toggle')?.addEventListener('click', handleLanguageToggle);
     root.querySelector('#btn-ai-assistant')?.addEventListener('click', () => {
       void handleGeminiToggle();
-    });
-
-    root.querySelectorAll<HTMLButtonElement>('.stock-card').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const sym = btn.dataset.symbol;
-        const found = state.watchlist.find((s) => s.symbol === sym);
-        if (found) void handleSpeakCard(found);
-      });
     });
   }
 
