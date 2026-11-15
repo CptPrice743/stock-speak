@@ -1,4 +1,4 @@
-import type { StockItem } from './types';
+import type { AssetType, Exchange, StockItem } from './types';
 
 export interface KnownStockEntry {
   pattern: RegExp;
@@ -6,9 +6,298 @@ export interface KnownStockEntry {
   nameEn: string;
   nameGu: string;
   nameHi: string;
+  exchange?: Exchange;
+  assetType?: AssetType;
+  category?: string;
+  tracks?: string;
 }
 
+export const KNOWN_INDIAN_INDICES: KnownStockEntry[] = [
+  {
+    pattern: /bse\s*sensex|\bsensex\b|સેન્સેક્સ|બીએસઈ\s*સેન્સેક્સ|सेंसेक्स|बीएसई\s*सेंसेक्स/i,
+    symbol: '^BSESN',
+    exchange: 'BSE',
+    assetType: 'index',
+    nameEn: 'BSE SENSEX',
+    nameGu: 'બીએસઈ સેન્સેક્સ',
+    nameHi: 'बीएसई सेंसेक्स',
+    tracks: 'Benchmark index of top 30 companies on Bombay Stock Exchange (BSE)',
+  },
+  {
+    pattern: /bank\s*nifty|nifty\s*bank|બેંક\s*નિફ્ટી|નિફ્ટી\s*બેંક|बैंक\s*निफ्टी|निफ्टी\s*बैंक/i,
+    symbol: '^NSEBANK',
+    exchange: 'NSE',
+    assetType: 'index',
+    nameEn: 'NIFTY BANK',
+    nameGu: 'નિફ્ટી બેંક',
+    nameHi: 'निफ्टी बैंक',
+    tracks: 'Index of the most liquid and large Indian banking stocks on NSE',
+  },
+  {
+    pattern: /nifty\s*it|નિફ્ટી\s*આઈટી|નિફ્ટી\s*આઇટી|निफ्टी\s*आईटी/i,
+    symbol: '^CNXIT',
+    exchange: 'NSE',
+    assetType: 'index',
+    nameEn: 'NIFTY IT',
+    nameGu: 'નિફ્ટી આઈટી',
+    nameHi: 'निफ्टी आईटी',
+    tracks: 'Index of major Indian IT companies on NSE',
+  },
+  {
+    pattern: /nifty\s*500|નિફ્ટી\s*500|નિફ્ટી\s*૫૦૦|निफ्टी\s*500/i,
+    symbol: '^CRSLDX',
+    exchange: 'NSE',
+    assetType: 'index',
+    nameEn: 'NIFTY 500',
+    nameGu: 'નિફ્ટી ૫૦૦',
+    nameHi: 'निफ्टी 500',
+    tracks: 'Broad market index of top 500 companies listed on NSE',
+  },
+  {
+    pattern: /nifty\s*50|nifty50|\bnifty\b|નિફ્ટી\s*50|નિફ્ટી\s*૫૦|નિફ્ટી\s*પચાસ|નિફ્ટી|निफ्टी\s*50|निफ्टी\s*पचास|निफ्टी/i,
+    symbol: '^NSEI',
+    exchange: 'NSE',
+    assetType: 'index',
+    nameEn: 'NIFTY 50',
+    nameGu: 'નિફ્ટી ૫૦',
+    nameHi: 'निफ्टी 50',
+    tracks: 'Benchmark index of top 50 large-cap Indian companies on NSE',
+  },
+  {
+    pattern: /national stock exchange|\bnse\s*(share|stock|company|ltd|limited)\b|એનએસઈ\s*(શેર|લિમિટેડ)|एनएसई\s*(शेयर|लिमिटेड)/i,
+    symbol: 'NSE.BO',
+    exchange: 'BSE',
+    assetType: 'stock',
+    nameEn: 'National Stock Exchange (NSE)',
+    nameGu: 'એનએસઈ શેર',
+    nameHi: 'एनएसई शेयर',
+  },
+  {
+    pattern: /bse\s*(ltd|limited|share|stock|company)|બીએસઈ\s*(શેર|લિમિટેડ)|बीएसई\s*(शेयर|लिमिटेड)/i,
+    symbol: 'BSE.NS',
+    exchange: 'NSE',
+    assetType: 'stock',
+    nameEn: 'BSE Limited',
+    nameGu: 'બીએસઈ લિમિટેડ',
+    nameHi: 'बीएसई लिमिटेड',
+  },
+];
+
+export const KNOWN_INDIAN_ETFS: KnownStockEntry[] = [
+  {
+    pattern: /sensex\s*bees|sensex\s*etf|સેન્સેક્સ\s*(બીઝ|ઈટીએફ|ઇટીએફ)|सेंसेक्स\s*(बीज़|बीज|ईटीएफ)/i,
+    symbol: 'SENSEXBEES.BO',
+    exchange: 'BSE',
+    assetType: 'etf',
+    category: 'Large Cap Index ETF',
+    nameEn: 'Nippon Sensex BeES ETF',
+    nameGu: 'સેન્સેક્સ બીઝ ઈટીએફ',
+    nameHi: 'सेंसेक्स बीज़ ईटीएफ',
+    tracks: 'Tracks BSE SENSEX (30 largest BSE companies)',
+  },
+  {
+    pattern: /nifty\s*bees|niftybees|નિફ્ટી\s*(બીઝ|ઈટીએફ|ઇટીએફ)|निफ्टी\s*(बीज़|बीज|ईटीएफ)/i,
+    symbol: 'NIFTYBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Large Cap Index ETF',
+    nameEn: 'Nifty BeES ETF',
+    nameGu: 'નિફ્ટી બીઝ ઈટીએફ',
+    nameHi: 'निफ्टी बीज़ ईटीएफ',
+    tracks: 'Tracks NIFTY 50 index (top 50 Indian companies)',
+  },
+  {
+    pattern: /sbi\s*nifty\s*(50\s*)?etf|setfnif50|એસબીઆઈ\s*નિફ્ટી\s*(ઈટીએફ|ઇટીએફ)|एसबीआई\s*निफ्टी\s*ईटीएफ/i,
+    symbol: 'SETFNIF50.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Large Cap Index ETF',
+    nameEn: 'SBI Nifty 50 ETF',
+    nameGu: 'એસબીઆઈ નિફ્ટી ઈટીએફ',
+    nameHi: 'एसबीआई निफ्टी ईटीएफ',
+    tracks: 'Tracks NIFTY 50 index managed by SBI Mutual Fund',
+  },
+  {
+    pattern: /hdfc\s*nifty\s*(50\s*)?etf|hdfcnifty|એચડીએફસી\s*નિફ્ટી\s*(ઈટીએફ|ઇટીએફ)|एचडीएफसी\s*निफ्टी\s*ईटीएफ/i,
+    symbol: 'HDFCNIFTY.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Large Cap Index ETF',
+    nameEn: 'HDFC Nifty 50 ETF',
+    nameGu: 'એચડીએફસી નિફ્ટી ઈટીએફ',
+    nameHi: 'एचडीएफसी निफ्टी ईटीएफ',
+    tracks: 'Tracks NIFTY 50 index managed by HDFC Mutual Fund',
+  },
+  {
+    pattern: /hdfc\s*gold\s*etf|hdfcgold|એચડીએફસી\s*ગોલ્ડ\s*(ઈટીએફ|ઇટીએફ)|एचडीएफसी\s*गोल्ड\s*ईटीएफ/i,
+    symbol: 'HDFCGOLD.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Gold Commodity ETF',
+    nameEn: 'HDFC Gold ETF',
+    nameGu: 'એચડીએફસી ગોલ્ડ ઈટીએફ',
+    nameHi: 'एचडीएफसी गोल्ड ईटीएफ',
+    tracks: 'Tracks domestic physical Gold prices',
+  },
+  {
+    pattern: /gold\s*bees|goldbees|gold\s*etf|ગોલ્ડ\s*(બીઝ|ઈટીએફ|ઇટીએફ)|સોના\s*(નો\s*)?ઈટીએફ|गोल्ड\s*(बीज़|बीज|ईटीएफ)|सोने\s*का\s*ईटीएफ/i,
+    symbol: 'GOLDBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Gold Commodity ETF',
+    nameEn: 'Gold BeES ETF',
+    nameGu: 'ગોલ્ડ બીઝ ઈટીએફ',
+    nameHi: 'गोल्ड बीज़ ईटीएफ',
+    tracks: 'Tracks physical Gold prices in India without making charges or storage risk',
+  },
+  {
+    pattern: /silver\s*bees|silverbees|silver\s*etf|સિલ્વર\s*(બીઝ|ઈટીએફ|ઇટીએફ)|ચાંદી\s*(નો\s*)?ઈટીએફ|सिल्वर\s*(बीज़|बीज|ईटीएफ)|चांदी\s*का\s*ईटीएफ/i,
+    symbol: 'SILVERBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Silver Commodity ETF',
+    nameEn: 'Silver BeES ETF',
+    nameGu: 'સિલ્વર બીઝ ઈટીએફ',
+    nameHi: 'सिल्वर बीज़ ईटीएफ',
+    tracks: 'Tracks physical Silver prices in India',
+  },
+  {
+    pattern: /psu\s*bank\s*(bees|etf)|psubnkbees|પીએસયુ\s*બેંક\s*(બીઝ|ઈટીએફ)|पीएसयू\s*बैंक\s*(बीज़|ईटीएफ)/i,
+    symbol: 'PSUBNKBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Sectoral Banking ETF',
+    nameEn: 'PSU Bank BeES ETF',
+    nameGu: 'પીએસયુ બેંક બીઝ ઈટીએફ',
+    nameHi: 'पीएसयू बैंक बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty PSU Bank index (government-owned Indian banks)',
+  },
+  {
+    pattern: /bank\s*bees|bankbees|bank\s*etf|બેંક\s*(બીઝ|ઈટીએફ|ઇટીએફ)|बैंक\s*(बीज़|बीज|ईटीएफ)/i,
+    symbol: 'BANKBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Sectoral Banking ETF',
+    nameEn: 'Bank BeES ETF',
+    nameGu: 'બેંક બીઝ ઈટીએફ',
+    nameHi: 'बैंक बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty Bank index (top 12 Indian banking stocks)',
+  },
+  {
+    pattern: /junior\s*bees|juniorbees|nifty\s*next\s*50\s*etf|જુનિયર\s*બીઝ|जूनियर\s*बीज़/i,
+    symbol: 'JUNIORBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Large Cap Next 50 ETF',
+    nameEn: 'Junior BeES ETF',
+    nameGu: 'જુનિયર બીઝ ઈટીએફ',
+    nameHi: 'जूनियर बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty Next 50 index (companies ranked 51-100 on NSE)',
+  },
+  {
+    pattern: /mid\s*150\s*bees|midcap\s*150\s*(bees|etf)|mid150bees|મિડકેપ\s*(બીઝ|ઈટીએફ)|मिडकैप\s*(बीज़|ईटीएफ)/i,
+    symbol: 'MID150BEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Midcap ETF',
+    nameEn: 'Midcap 150 BeES ETF',
+    nameGu: 'મિડકેપ ૧૫૦ બીઝ ઈટીએફ',
+    nameHi: 'मिडकैप 150 बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty Midcap 150 index',
+  },
+  {
+    pattern: /\bit\s*bees\b|itbees|\bit\s*etf\b|આઈટી\s*(બીઝ|ઈટીએફ)|આઇટી\s*(બીઝ|ઇટીએફ)|आईटी\s*(बीज़|ईटीएफ)/i,
+    symbol: 'ITBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Sectoral IT ETF',
+    nameEn: 'Nifty IT BeES ETF',
+    nameGu: 'આઈટી બીઝ ઈટીએફ',
+    nameHi: 'आईटी बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty IT index (TCS, Infosys, Wipro, HCL Tech, etc.)',
+  },
+  {
+    pattern: /pharma\s*bees|pharmabees|pharma\s*etf|ફાર્મા\s*(બીઝ|ઈટીએફ)|फार्मा\s*(बीज़|ईटीएफ)/i,
+    symbol: 'PHARMABEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Sectoral Pharma ETF',
+    nameEn: 'Pharma BeES ETF',
+    nameGu: 'ફાર્મા બીઝ ઈટીએફ',
+    nameHi: 'फार्मा बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty Pharma index (Sun Pharma, Cipla, Dr Reddy, etc.)',
+  },
+  {
+    pattern: /auto\s*bees|autobees|auto\s*etf|ઓટો\s*(બીઝ|ઈટીએફ)|ऑटो\s*(बीज़|ईटीएफ)/i,
+    symbol: 'AUTOBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Sectoral Auto ETF',
+    nameEn: 'Auto BeES ETF',
+    nameGu: 'ઓટો બીઝ ઈટીએફ',
+    nameHi: 'ऑटो बीज़ ईटीएफ',
+    tracks: 'Tracks Nifty Auto index (Maruti, Tata Motors, M&M, Bajaj Auto)',
+  },
+  {
+    pattern: /liquid\s*bees|liquidbees|liquid\s*etf|લિક્વિડ\s*(બીઝ|ઈટીએફ)|लिक्विड\s*(बीज़|ईटीएफ)/i,
+    symbol: 'LIQUIDBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'Debt / Overnight Liquid ETF',
+    nameEn: 'Liquid BeES ETF',
+    nameGu: 'લિક્વિડ બીઝ ઈટીએફ',
+    nameHi: 'लिक्विड बीज़ ईटीएफ',
+    tracks: 'Low-risk overnight money market / cash-equivalent ETF',
+  },
+  {
+    pattern: /cpse\s*etf|cpseetf|સીપીએસઈ\s*(ઈટીએફ|ઇટીએફ)|सीपीएसई\s*ईटीएफ/i,
+    symbol: 'CPSEETF.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'PSU Thematic ETF',
+    nameEn: 'CPSE ETF',
+    nameGu: 'સીપીએસઈ ઈટીએફ',
+    nameHi: 'सीपीएसई ईटीएफ',
+    tracks: 'Tracks government-owned Central Public Sector Enterprises (NTPC, ONGC, Power Grid, Coal India, BEL)',
+  },
+  {
+    pattern: /bharat\s*22|icicib22|ભારત\s*22|ભારત\s*૨૨|भारत\s*22/i,
+    symbol: 'ICICIB22.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'PSU & Blue-chip Thematic ETF',
+    nameEn: 'Bharat 22 ETF',
+    nameGu: 'ભારત ૨૨ ઈટીએફ',
+    nameHi: 'भारत 22 ईटीएफ',
+    tracks: 'Tracks S&P BSE Bharat 22 index (22 PSU & select private blue-chips)',
+  },
+  {
+    pattern: /mon100|nasdaq\s*100|nasdaq\s*etf|નાસ્ડેક|नैस्डैक/i,
+    symbol: 'MON100.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'International US Tech ETF',
+    nameEn: 'Motilal Nasdaq 100 ETF',
+    nameGu: 'નાસ્ડેક ૧૦૦ ઈટીએફ',
+    nameHi: 'नैस्डैक 100 ईटीएफ',
+    tracks: 'Tracks US Nasdaq 100 index (Apple, Microsoft, Nvidia, Google, Amazon) in INR',
+  },
+  {
+    pattern: /mafang|fang\s*etf|ફેંગ\s*ઈટીએફ|फैंग\s*ईटीएफ/i,
+    symbol: 'MAFANG.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    category: 'International US Tech ETF',
+    nameEn: 'Mirae NYSE FANG+ ETF',
+    nameGu: 'ફેંગ પ્લસ ઈટીએફ',
+    nameHi: 'फैंग प्लस ईटीएफ',
+    tracks: 'Tracks 10 US mega-cap tech & growth stocks in INR',
+  },
+];
+
 export const KNOWN_INDIAN_STOCKS: KnownStockEntry[] = [
+  ...KNOWN_INDIAN_ETFS,
+  ...KNOWN_INDIAN_INDICES,
   {
     pattern: /wipro|vipro|wirpo|વિપ્રો|વીપ્રો|विप्रो/i,
     symbol: 'WIPRO.NS',
@@ -543,6 +832,23 @@ const CONVERSATIONAL_STOPWORDS = new Set([
   'laiye', 'karu', 'kari', 'lau', 'laie', 'ketlo', 'ketla', 'par', 'ma', 'list',
 ]);
 
+export function isIndexSymbol(symbol: string): boolean {
+  return symbol.trim().startsWith('^');
+}
+
+export function inferAssetType(symbol: string, quoteType?: string): AssetType {
+  const upper = symbol.trim().toUpperCase();
+  if (upper.startsWith('^') || quoteType === 'INDEX') return 'index';
+  if (
+    quoteType === 'ETF' ||
+    KNOWN_INDIAN_ETFS.some((e) => e.symbol === upper) ||
+    /(BEES|ETF|IETF)\.(NS|BO)$/i.test(upper)
+  ) {
+    return 'etf';
+  }
+  return 'stock';
+}
+
 export function normalizeStockSearchQuery(rawQuery: string): string {
   const trimmed = rawQuery.trim();
   if (!trimmed) return '';
@@ -621,7 +927,9 @@ export function extractVoiceActionFromTranscripts(
 
   // 1. Check user's current watchlist first (essential for remove & watchlist price checks)
   for (const item of watchlist) {
-    const bareTicker = item.symbol.replace(/\.(NS|BO)$/i, '');
+    const bareTicker = item.symbol
+      .replace(/^\^|\.(NS|BO)$/gi, '')
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedEn = item.nameEn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedGu = item.nameGu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedHi = item.nameHi.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -631,7 +939,7 @@ export function extractVoiceActionFromTranscripts(
     }
   }
 
-  // 2. Check our 60+ Known Indian Stocks dictionary
+  // 2. Check our Known Indian Indices, ETFs & Stocks dictionary
   for (const entry of KNOWN_INDIAN_STOCKS) {
     if (entry.pattern.test(combined)) {
       return {
@@ -639,7 +947,8 @@ export function extractVoiceActionFromTranscripts(
         query: entry.symbol,
         knownStock: {
           symbol: entry.symbol,
-          exchange: 'NSE',
+          exchange: entry.exchange ?? (entry.symbol.endsWith('.BO') ? 'BSE' : 'NSE'),
+          assetType: entry.assetType ?? inferAssetType(entry.symbol),
           nameEn: entry.nameEn,
           nameGu: entry.nameGu,
           nameHi: entry.nameHi,

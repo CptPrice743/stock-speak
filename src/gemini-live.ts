@@ -1,5 +1,10 @@
 import { fetchQuotes, requestGeminiSession, searchIndianStocks } from './api';
-import { KNOWN_INDIAN_STOCKS } from './indic-stocks';
+import {
+  inferAssetType,
+  isIndexSymbol,
+  KNOWN_INDIAN_ETFS,
+  KNOWN_INDIAN_STOCKS,
+} from './indic-stocks';
 import type { AppConfig, Language, QuoteData, StockItem } from './types';
 
 export interface GeminiLiveCallbacks {
@@ -13,55 +18,73 @@ export interface GeminiLiveCallbacks {
   ) => void;
 }
 
-const SYSTEM_PROMPT = `You are Dada's warm, patient, and respectful Gujarati and Hindi voice stock assistant.
-Dada is an elderly gentleman with severe vision loss. He cannot read the screen and talks to you like a caring family member.
-Address him warmly and respectfully as "દાદા" or "दादाजी".
+const SYSTEM_PROMPT = `You are a calm, polite, and helpful Gujarati and Hindi voice assistant for Indian stocks, ETFs, and market indices.
+The user has severe vision loss and cannot read the screen. Everything works 100% through voice.
 
-HOW TO CONVERSE:
-- Speak naturally, unhurriedly, and gently in clear Gujarati (or Hindi if he speaks Hindi).
-- Keep your answers calm, unhurried, and conversational (1-2 natural sentences).
-- Never sound robotic, hurried, or like a script. Speak like a loving grandchild or companion.
-- NEVER ask Dada to look at the screen or tap buttons because he cannot see them. Everything is done 100% through voice.
+HOW TO SPEAK (STRICT):
+- Speak naturally, politely, and directly in clear Gujarati (or Hindi if the user speaks Hindi).
+- Do NOT say "દાદા" or "दादाजी" in your replies. Skip repetitive terms of address and greetings altogether — just speak naturally like a helpful, respectful person.
+- Keep answers concise and conversational (1-2 natural sentences, or 2-3 simple sentences when explaining ETFs).
+- NEVER sound robotic, hurried, or scripted, and NEVER ask the user to look at the screen or tap buttons.
+- For Market Indices like NIFTY 50, BSE SENSEX, NIFTY BANK, and NIFTY IT (unit: "points"), state the level in points ("પોઇન્ટ" / "पॉइंट"), not rupees.
+- For listed stocks (including NSE Ltd / BSE Ltd shares) and ETFs, state the price in rupees ("રૂપિયા" / "रुपये").
 
 TOOLS:
-- get_live_stock_price: call whenever Dada asks about any stock's price or market movement. When the data returns, state the price in a simple, respectful sentence.
-- add_stock_to_watchlist: call when Dada asks to add a stock to his list.
-- remove_stock_from_watchlist: when Dada asks to remove a stock, always confirm with him verbally first in a gentle tone (e.g., "દાદા, શું તમે સાચે જ આઈટીસી લિસ્ટમાંથી કાઢી નાખવા માંગો છો?"). If he confirms yes ("હા", "હા કાઢી નાખો", "yes"), call remove_stock_from_watchlist and confirm warmly. If he says no ("ના", "રહેવા દો", "no"), reassure him that you kept it.`;
+- get_live_stock_price: call whenever the user asks for the live price or movement of any Indian stock, ETF (Gold BeES, Nifty BeES, Silver BeES, Bank BeES, etc.), or Market Index (NIFTY 50, BSE SENSEX, NSE, BSE, NIFTY BANK). When the data returns, state the price clearly and naturally. If a query like "NSE" returns both the NIFTY 50 index and NSE Ltd share price, mention both briefly.
+- get_etf_info: call whenever the user asks what an ETF is, asks about ETF categories/options in India (Gold, Silver, Nifty, Bank, IT, Nasdaq, Liquid, PSU), or wants details and live prices for Indian ETFs. Explain simply without financial jargon.
+- add_stock_to_watchlist: call when the user asks to add a stock, ETF, or index to the watchlist.
+- remove_stock_from_watchlist: when the user asks to remove an item, always confirm verbally first in a polite tone (e.g., "શું તમે સાચે જ આઈટીસી લિસ્ટમાંથી કાઢી નાખવા માંગો છો?"). Only call remove_stock_from_watchlist if they confirm yes ("હા", "હા કાઢી નાખો", "yes"). If they say no ("ના", "રહેવા દો", "no"), reassure them that you kept it.`;
 
 const TOOL_DECLARATIONS = [
   {
     name: 'get_live_stock_price',
-    description: 'Fetch the real-time NSE or BSE market price and rupee change for any Indian stock in INR.',
+    description:
+      'Fetch the real-time NSE or BSE price for any Indian stock (.NS/.BO), Indian ETF (e.g. NIFTYBEES, GOLDBEES, SILVERBEES, BANKBEES), or Indian Market Index (NIFTY 50, BSE SENSEX, NIFTY BANK, NIFTY IT, NSE, BSE).',
     parameters: {
       type: 'OBJECT',
       properties: {
         query: {
           type: 'STRING',
-          description: 'Company name or NSE/BSE ticker symbol in English (e.g., Wipro, Infosys, Reliance, TCS, Zomato, ITC.NS)',
+          description:
+            'Company, ETF, or index name/symbol in English (e.g., NIFTY 50, BSE SENSEX, NSE, Wipro, Gold BeES, Nifty BeES, Reliance)',
         },
       },
       required: ['query'],
     },
   },
   {
-    name: 'add_stock_to_watchlist',
-    description: 'Add a verified NSE (.NS) or BSE (.BO) stock to Dada watchlist.',
+    name: 'get_etf_info',
+    description:
+      'Explain what Indian ETFs are and return verified Indian ETFs (Nifty, Gold, Silver, Bank, IT, Pharma, Liquid, Nasdaq 100, CPSE) along with what they track and their live prices.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        symbol: { type: 'STRING', description: 'Exact ticker ending in .NS or .BO' },
-        nameEn: { type: 'STRING', description: 'Short English company name, e.g. Wipro, Tata Steel' },
+        query: {
+          type: 'STRING',
+          description: 'Optional ETF name or category (e.g., gold, silver, nifty, bank, it, liquid, nasdaq, all)',
+        },
+      },
+    },
+  },
+  {
+    name: 'add_stock_to_watchlist',
+    description: 'Add a verified NSE (.NS), BSE (.BO), ETF, or Indian index (^NSEI, ^BSESN) to the watchlist.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        symbol: { type: 'STRING', description: 'Exact ticker ending in .NS or .BO, or index like ^NSEI or ^BSESN' },
+        nameEn: { type: 'STRING', description: 'Short English display name, e.g. NIFTY 50, Gold BeES ETF, Wipro' },
       },
       required: ['symbol', 'nameEn'],
     },
   },
   {
     name: 'remove_stock_from_watchlist',
-    description: 'Remove a stock from Dada watchlist after Dada verbally confirms.',
+    description: 'Remove a stock, ETF, or index from the watchlist after the user verbally confirms.',
     parameters: {
       type: 'OBJECT',
       properties: {
-        symbol: { type: 'STRING', description: 'Exact ticker being removed, e.g. ITC.NS' },
+        symbol: { type: 'STRING', description: 'Exact ticker being removed, e.g. ITC.NS or ^NSEI' },
       },
       required: ['symbol'],
     },
@@ -226,8 +249,14 @@ export class GeminiLiveController {
           .map((s) => {
             const q = currentQuotes[s.symbol];
             if (!q) return `${s.symbol} (${s.nameEn})`;
-            const dir = q.change >= 0 ? `up ₹${q.change}` : `down ₹${Math.abs(q.change)}`;
-            return `${s.symbol} (${s.nameEn}: ₹${q.regularMarketPrice}, ${dir})`;
+            const isIndex = s.assetType === 'index' || isIndexSymbol(s.symbol);
+            const prefix = isIndex ? '' : '₹';
+            const suffix = isIndex ? ' pts' : '';
+            const dir =
+              q.change >= 0
+                ? `up ${prefix}${q.change}${suffix}`
+                : `down ${prefix}${Math.abs(q.change)}${suffix}`;
+            return `${s.symbol} (${s.nameEn}: ${prefix}${q.regularMarketPrice}${suffix}, ${dir})`;
           })
           .join('; ');
 
@@ -253,7 +282,7 @@ export class GeminiLiveController {
             systemInstruction: {
               parts: [
                 {
-                  text: `${SYSTEM_PROMPT}\nLanguage: ${lang === 'gu' ? 'Gujarati' : 'Hindi'}.\nDada current watchlist: ${listSummary}`,
+                  text: `${SYSTEM_PROMPT}\nLanguage: ${lang === 'gu' ? 'Gujarati' : 'Hindi'}.\nCurrent watchlist: ${listSummary}`,
                 },
               ],
             },
@@ -293,7 +322,7 @@ export class GeminiLiveController {
             await this.startMicStreaming();
             this.resetSilenceTimer(callbacks);
 
-            // Natural, warm initial prompt
+            // Natural, polite initial prompt without repetitive "Dada" address
             ws.send(
               JSON.stringify({
                 clientContent: {
@@ -304,8 +333,8 @@ export class GeminiLiveController {
                         {
                           text:
                             lang === 'gu'
-                              ? 'દાદાએ વાત કરવા માઈક ચાલુ કર્યું છે. એકદમ પ્રેમથી અને ટૂંકમાં કહો: પ્રણામ દાદા, કયા શેર વિશે જાણવું છે?'
-                              : 'दादाजी ने बात करने के लिए माइक चालू किया है। बहुत प्यार से और संक्षेप में कहें: प्रणाम दादाजी, किस शेयर के बारे में जानना है?',
+                              ? 'યુઝરે વાત કરવા માઈક ચાલુ કર્યું છે. "દાદા" કે કોઈ નામ બોલ્યા વગર સહજતાથી અને ટૂંકમાં પૂછો: "નમસ્તે, કયા શેર, ઈટીએફ કે માર્કેટ વિશે જાણવું છે?"'
+                              : 'यूज़र ने बात करने के लिए माइक चालू किया है। "दादा" या कोई संबोधन बोले बिना सहजता से और संक्षेप में पूछें: "नमस्ते, किस शेयर, ईटीएफ या मार्केट के बारे में जानना है?"',
                         },
                       ],
                     },
@@ -414,6 +443,38 @@ export class GeminiLiveController {
     }, waitMs);
   }
 
+  private buildQuoteOutput(q: QuoteData, displayName: string): Record<string, unknown> {
+    const assetType = inferAssetType(q.symbol, q.instrumentType);
+    const isIndex = assetType === 'index';
+    const direction = q.change > 0.005 ? 'up' : q.change < -0.005 ? 'down' : 'unchanged';
+    const knownEtf = KNOWN_INDIAN_ETFS.find((e) => e.symbol === q.symbol);
+
+    return {
+      found: true,
+      symbol: q.symbol,
+      name: displayName || q.shortName || q.symbol,
+      assetType,
+      unit: isIndex ? 'points' : 'rupees',
+      ...(isIndex
+        ? {
+            pricePoints: q.regularMarketPrice,
+            changePoints: Number(Math.abs(q.change).toFixed(2)),
+          }
+        : {
+            priceRupees: q.regularMarketPrice,
+            changeRupees: Number(Math.abs(q.change).toFixed(2)),
+          }),
+      percentChange: Number(Math.abs(q.percentChange).toFixed(2)),
+      direction,
+      previousClose: q.previousClose,
+      ...(q.dayHigh !== undefined ? { dayHigh: q.dayHigh } : {}),
+      ...(q.dayLow !== undefined ? { dayLow: q.dayLow } : {}),
+      ...(q.fiftyTwoWeekHigh !== undefined ? { fiftyTwoWeekHigh: q.fiftyTwoWeekHigh } : {}),
+      ...(q.fiftyTwoWeekLow !== undefined ? { fiftyTwoWeekLow: q.fiftyTwoWeekLow } : {}),
+      ...(knownEtf ? { etfCategory: knownEtf.category, tracks: knownEtf.tracks } : {}),
+    };
+  }
+
   private async handleToolCalls(
     calls: Array<{ id: string; name: string; args?: Record<string, unknown> }>,
     lang: Language,
@@ -432,41 +493,82 @@ export class GeminiLiveController {
       if (call.name === 'get_live_stock_price') {
         const query = String(args.query ?? '').trim();
         try {
-          let targetSymbol = '';
-          let companyName = query;
-
-          // 1. Check watchlist
-          const wl = callbacks.getWatchlist();
-          const inWl = wl.find(
-            (s) =>
-              s.symbol.toLowerCase() === query.toLowerCase() ||
-              s.nameEn.toLowerCase().includes(query.toLowerCase()) ||
-              s.nameGu.includes(query) ||
-              s.nameHi.includes(query)
-          );
-          if (inWl) {
-            targetSymbol = inWl.symbol;
-            companyName = inWl.nameEn;
+          // Handle ambiguous exchange names ("NSE", "BSE") by returning both the benchmark index and the listed exchange share
+          if (/^(\^?nse|national stock exchange|એનએસઈ|एनएसई)$/i.test(query)) {
+            const quoteMap = await fetchQuotes(['^NSEI', 'NSE.BO']);
+            const idxQ = quoteMap['^NSEI'];
+            const eqQ = quoteMap['NSE.BO'];
+            responses.push({
+              id: call.id,
+              name: call.name,
+              response: {
+                output: {
+                  found: Boolean(idxQ || eqQ),
+                  note: 'NSE refers to the National Stock Exchange; its benchmark market index is NIFTY 50 (^NSEI) and its listed company share is NSE.BO.',
+                  ...(idxQ ? { nifty50Index: this.buildQuoteOutput(idxQ, 'NIFTY 50 (NSE Benchmark Index)') } : {}),
+                  ...(eqQ ? { nseListedShare: this.buildQuoteOutput(eqQ, 'National Stock Exchange of India Ltd (Listed Share)') } : {}),
+                },
+              },
+            });
+            continue;
           }
 
-          // 2. Check 60+ Known Indian Stocks
+          if (/^(\^?bse|bombay stock exchange|બીએસઈ|बीएसई)$/i.test(query)) {
+            const quoteMap = await fetchQuotes(['^BSESN', 'BSE.NS']);
+            const idxQ = quoteMap['^BSESN'];
+            const eqQ = quoteMap['BSE.NS'];
+            responses.push({
+              id: call.id,
+              name: call.name,
+              response: {
+                output: {
+                  found: Boolean(idxQ || eqQ),
+                  note: 'BSE refers to the Bombay Stock Exchange; its benchmark market index is BSE SENSEX (^BSESN) and its listed company share is BSE.NS.',
+                  ...(idxQ ? { sensexIndex: this.buildQuoteOutput(idxQ, 'S&P BSE SENSEX (BSE Benchmark Index)') } : {}),
+                  ...(eqQ ? { bseListedShare: this.buildQuoteOutput(eqQ, 'BSE Limited (Listed Share)') } : {}),
+                },
+              },
+            });
+            continue;
+          }
+
+          let targetSymbol = '';
+          let companyName = query;
+          const qLower = query.toLowerCase();
+
+          // 1. Check Known Indian ETFs, Indices & Stocks (exact/pattern match first to avoid substring collisions like "nse" in "sensex")
+          const hit = KNOWN_INDIAN_STOCKS.find(
+            (k) =>
+              k.pattern.test(query) ||
+              k.nameEn.toLowerCase() === qLower ||
+              k.symbol.toLowerCase() === qLower
+          );
+          if (hit) {
+            targetSymbol = hit.symbol;
+            companyName = hit.nameEn;
+          }
+
+          // 2. Check watchlist
           if (!targetSymbol) {
-            const hit = KNOWN_INDIAN_STOCKS.find(
-              (k) =>
-                k.pattern.test(query) ||
-                k.nameEn.toLowerCase() === query.toLowerCase() ||
-                k.symbol.toLowerCase() === query.toLowerCase()
+            const wl = callbacks.getWatchlist();
+            const inWl = wl.find(
+              (s) =>
+                s.symbol.toLowerCase() === qLower ||
+                s.nameEn.toLowerCase() === qLower ||
+                (qLower.length >= 4 && s.nameEn.toLowerCase().includes(qLower)) ||
+                s.nameGu.includes(query) ||
+                s.nameHi.includes(query)
             );
-            if (hit) {
-              targetSymbol = hit.symbol;
-              companyName = hit.nameEn;
+            if (inWl) {
+              targetSymbol = inWl.symbol;
+              companyName = inWl.nameEn;
             }
           }
 
-          // 3. Fallback to Yahoo Search
+          // 3. Fallback to Yahoo Search (now includes EQUITY, ETF, and Indian INDEX)
           if (!targetSymbol) {
             const matches = await searchIndianStocks(query);
-            const preferred = matches.find((m) => m.symbol.endsWith('.NS')) ?? matches[0];
+            const preferred = matches.find((m) => m.symbol.endsWith('.NS') || m.symbol.startsWith('^')) ?? matches[0];
             if (preferred) {
               targetSymbol = preferred.symbol;
               companyName = preferred.shortname || preferred.symbol;
@@ -477,7 +579,7 @@ export class GeminiLiveController {
             responses.push({
               id: call.id,
               name: call.name,
-              response: { output: { found: false, message: `No Indian NSE/BSE stock found for ${query}` } },
+              response: { output: { found: false, message: `No Indian stock, ETF, or index found for ${query}` } },
             });
             continue;
           }
@@ -493,21 +595,10 @@ export class GeminiLiveController {
             continue;
           }
 
-          const direction = q.change > 0.005 ? 'up' : q.change < -0.005 ? 'down' : 'unchanged';
           responses.push({
             id: call.id,
             name: call.name,
-            response: {
-              output: {
-                found: true,
-                symbol: q.symbol,
-                companyName,
-                priceRupees: q.regularMarketPrice,
-                changeRupees: Number(Math.abs(q.change).toFixed(2)),
-                percentChange: Number(Math.abs(q.percentChange).toFixed(2)),
-                direction,
-              },
-            },
+            response: { output: this.buildQuoteOutput(q, companyName) },
           });
         } catch {
           responses.push({
@@ -516,13 +607,84 @@ export class GeminiLiveController {
             response: { output: { found: false, error: 'Lookup failed' } },
           });
         }
+      } else if (call.name === 'get_etf_info') {
+        const query = String(args.query ?? '').trim().toLowerCase();
+        try {
+          let matching =
+            query && query !== 'all' && query !== 'overview'
+              ? KNOWN_INDIAN_ETFS.filter(
+                  (e) =>
+                    e.pattern.test(query) ||
+                    e.nameEn.toLowerCase().includes(query) ||
+                    (e.category ?? '').toLowerCase().includes(query) ||
+                    (e.tracks ?? '').toLowerCase().includes(query)
+                )
+              : [];
+
+          if (matching.length === 0) {
+            const featuredSymbols = new Set([
+              'NIFTYBEES.NS',
+              'GOLDBEES.NS',
+              'SILVERBEES.NS',
+              'BANKBEES.NS',
+              'LIQUIDBEES.NS',
+            ]);
+            matching = KNOWN_INDIAN_ETFS.filter((e) => featuredSymbols.has(e.symbol));
+          } else {
+            matching = matching.slice(0, 5);
+          }
+
+          const symbols = matching.map((e) => e.symbol);
+          const quoteMap = await fetchQuotes(symbols);
+          const etfs = matching.map((e) => {
+            const q = quoteMap[e.symbol];
+            return {
+              symbol: e.symbol,
+              name: e.nameEn,
+              category: e.category,
+              tracks: e.tracks,
+              ...(q ? this.buildQuoteOutput(q, e.nameEn) : { priceAvailable: false }),
+            };
+          });
+
+          responses.push({
+            id: call.id,
+            name: call.name,
+            response: {
+              output: {
+                whatIsEtf:
+                  'An ETF (Exchange Traded Fund) is a ready-made basket of shares, gold, silver, or overnight debt that trades on NSE/BSE like a normal share at low cost.',
+                etfs,
+              },
+            },
+          });
+        } catch {
+          responses.push({
+            id: call.id,
+            name: call.name,
+            response: {
+              output: {
+                whatIsEtf:
+                  'An ETF (Exchange Traded Fund) is a basket of shares, gold, or silver traded on NSE/BSE like a regular share.',
+                etfs: KNOWN_INDIAN_ETFS.slice(0, 5).map((e) => ({
+                  symbol: e.symbol,
+                  name: e.nameEn,
+                  category: e.category,
+                  tracks: e.tracks,
+                })),
+              },
+            },
+          });
+        }
       } else if (call.name === 'add_stock_to_watchlist') {
         const rawSymbol = String(args.symbol ?? '').trim().toUpperCase();
         let targetSymbol = rawSymbol;
         let companyName = String(args.nameEn ?? rawSymbol);
 
-        if (!targetSymbol.endsWith('.NS') && !targetSymbol.endsWith('.BO')) {
-          const hit = KNOWN_INDIAN_STOCKS.find((k) => k.pattern.test(targetSymbol) || k.nameEn.toLowerCase() === companyName.toLowerCase());
+        if (!targetSymbol.endsWith('.NS') && !targetSymbol.endsWith('.BO') && !targetSymbol.startsWith('^')) {
+          const hit = KNOWN_INDIAN_STOCKS.find(
+            (k) => k.pattern.test(targetSymbol) || k.nameEn.toLowerCase() === companyName.toLowerCase()
+          );
           if (hit) {
             targetSymbol = hit.symbol;
             companyName = hit.nameEn;
@@ -532,7 +694,8 @@ export class GeminiLiveController {
         const hit = KNOWN_INDIAN_STOCKS.find((k) => k.symbol === targetSymbol);
         const stock: StockItem = {
           symbol: targetSymbol,
-          exchange: targetSymbol.endsWith('.BO') ? 'BSE' : 'NSE',
+          exchange: hit?.exchange ?? (targetSymbol.endsWith('.BO') || targetSymbol === '^BSESN' ? 'BSE' : 'NSE'),
+          assetType: hit?.assetType ?? inferAssetType(targetSymbol),
           nameEn: companyName || hit?.nameEn || targetSymbol,
           nameGu: hit?.nameGu || companyName || targetSymbol,
           nameHi: hit?.nameHi || companyName || targetSymbol,
@@ -546,7 +709,9 @@ export class GeminiLiveController {
         });
       } else if (call.name === 'remove_stock_from_watchlist') {
         const symbol = String(args.symbol ?? '').trim().toUpperCase();
-        const found = callbacks.getWatchlist().find((s) => s.symbol === symbol || s.nameEn.toLowerCase().includes(symbol.toLowerCase()));
+        const found = callbacks
+          .getWatchlist()
+          .find((s) => s.symbol === symbol || s.nameEn.toLowerCase().includes(symbol.toLowerCase()));
         const targetSymbol = found ? found.symbol : symbol;
         await callbacks.onRemoveStockConfirmed(targetSymbol);
         responses.push({

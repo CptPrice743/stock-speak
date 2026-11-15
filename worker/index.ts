@@ -1,5 +1,10 @@
 import { DEFAULT_CONFIG, DEFAULT_WATCHLIST } from '../src/defaults';
-import { normalizeStockSearchQuery } from '../src/indic-stocks';
+import {
+  inferAssetType,
+  KNOWN_INDIAN_ETFS,
+  KNOWN_INDIAN_INDICES,
+  normalizeStockSearchQuery,
+} from '../src/indic-stocks';
 import type { AppConfig, QuoteData, SearchMatch, StockItem } from '../src/types';
 
 export interface Env {
@@ -14,7 +19,9 @@ type AuthRole = 'admin' | 'dada' | null;
 
 const KV_WATCHLIST_KEY = 'watchlist:main';
 const KV_CONFIG_KEY = 'config:main';
-const TICKER_PATTERN = /^[A-Z0-9.&-]{1,20}\.(NS|BO)$/;
+const KV_MIGRATION_V1_KEY = 'migration:indices_etf_v1';
+const TICKER_PATTERN = /^(?:[A-Z0-9.&-]{1,24}\.(?:NS|BO)|\^[A-Z0-9.-]{1,20})$/;
+const ALLOWED_SEARCH_QUOTE_TYPES = new Set(['EQUITY', 'ETF', 'INDEX']);
 
 interface RateBucket {
   count: number;
@@ -83,19 +90,15 @@ function jsonResponse(body: unknown, status = 200, extraHeaders?: Record<string,
 }
 
 async function readStateFromKV(env: Env): Promise<{ watchlist: StockItem[]; config: AppConfig }> {
-  const [rawWatchlist, rawConfig] = await Promise.all([
+  const [rawWatchlist, rawConfig, migratedV1] = await Promise.all([
     env.STOCK_SPEAK_KV.get<StockItem[]>(KV_WATCHLIST_KEY, 'json'),
     env.STOCK_SPEAK_KV.get<AppConfig>(KV_CONFIG_KEY, 'json'),
+    env.STOCK_SPEAK_KV.get(KV_MIGRATION_V1_KEY),
   ]);
 
   let watchlist = rawWatchlist;
   let config = rawConfig;
   const writes: Promise<void>[] = [];
-
-  if (!Array.isArray(watchlist) || watchlist.length === 0) {
-    watchlist = DEFAULT_WATCHLIST;
-    writes.push(env.STOCK_SPEAK_KV.put(KV_WATCHLIST_KEY, JSON.stringify(watchlist)));
-  }
 
   if (!config || typeof config.configVersion !== 'number') {
     config = { ...DEFAULT_CONFIG };
@@ -106,6 +109,31 @@ async function readStateFromKV(env: Env): Promise<{ watchlist: StockItem[]; conf
       config.geminiModel = 'models/gemini-3.8-live';
       writes.push(env.STOCK_SPEAK_KV.put(KV_CONFIG_KEY, JSON.stringify(config)));
     }
+  }
+
+  if (!Array.isArray(watchlist) || watchlist.length === 0) {
+    watchlist = DEFAULT_WATCHLIST;
+    writes.push(env.STOCK_SPEAK_KV.put(KV_WATCHLIST_KEY, JSON.stringify(watchlist)));
+    if (!migratedV1) {
+      writes.push(env.STOCK_SPEAK_KV.put(KV_MIGRATION_V1_KEY, '1'));
+    }
+  } else if (!migratedV1) {
+    const starterSymbols = ['^NSEI', '^BSESN', 'NSE.BO', 'NIFTYBEES.NS', 'GOLDBEES.NS'];
+    const existing = new Set(watchlist.map((s) => s.symbol.toUpperCase()));
+    const toPrepend = DEFAULT_WATCHLIST.filter(
+      (s) => starterSymbols.includes(s.symbol) && !existing.has(s.symbol.toUpperCase())
+    );
+    if (toPrepend.length > 0) {
+      watchlist = [...toPrepend, ...watchlist].slice(0, 25);
+      config = {
+        ...config,
+        configVersion: config.configVersion + 1,
+        updatedAt: new Date().toISOString(),
+      };
+      writes.push(env.STOCK_SPEAK_KV.put(KV_WATCHLIST_KEY, JSON.stringify(watchlist)));
+      writes.push(env.STOCK_SPEAK_KV.put(KV_CONFIG_KEY, JSON.stringify(config)));
+    }
+    writes.push(env.STOCK_SPEAK_KV.put(KV_MIGRATION_V1_KEY, '1'));
   }
 
   if (writes.length > 0) {
@@ -129,12 +157,17 @@ function sanitizeWatchlist(input: unknown): StockItem[] | null {
     if (!TICKER_PATTERN.test(symbol) || seen.has(symbol)) continue;
     seen.add(symbol);
 
-    const exchange = symbol.endsWith('.BO') ? 'BSE' : 'NSE';
+    const exchange = symbol.endsWith('.BO') || symbol === '^BSESN' ? 'BSE' : 'NSE';
+    const rawAssetType = typeof item.assetType === 'string' ? item.assetType.toLowerCase() : undefined;
+    const assetType =
+      rawAssetType === 'index' || rawAssetType === 'etf' || rawAssetType === 'stock'
+        ? rawAssetType
+        : inferAssetType(symbol);
     const nameEn = typeof item.nameEn === 'string' && item.nameEn.trim() ? item.nameEn.trim().slice(0, 60) : symbol;
     const nameGu = typeof item.nameGu === 'string' && item.nameGu.trim() ? item.nameGu.trim().slice(0, 60) : nameEn;
     const nameHi = typeof item.nameHi === 'string' && item.nameHi.trim() ? item.nameHi.trim().slice(0, 60) : nameEn;
 
-    clean.push({ symbol, exchange, nameEn, nameGu, nameHi });
+    clean.push({ symbol, exchange, assetType, nameEn, nameGu, nameHi });
   }
 
   return clean.length > 0 ? clean : null;
@@ -195,10 +228,17 @@ async function fetchYahooQuote(symbol: string): Promise<QuoteData | null> {
         meta?: {
           symbol?: string;
           currency?: string;
+          instrumentType?: string;
+          shortName?: string;
+          longName?: string;
           regularMarketPrice?: number;
           chartPreviousClose?: number;
           previousClose?: number;
           regularMarketTime?: number;
+          regularMarketDayHigh?: number;
+          regularMarketDayLow?: number;
+          fiftyTwoWeekHigh?: number;
+          fiftyTwoWeekLow?: number;
         };
       }>;
     };
@@ -222,6 +262,12 @@ async function fetchYahooQuote(symbol: string): Promise<QuoteData | null> {
       ? new Date(meta.regularMarketTime * 1000).toISOString()
       : new Date().toISOString(),
     currency: meta.currency ?? 'INR',
+    instrumentType: meta.instrumentType,
+    shortName: meta.shortName || meta.longName,
+    dayHigh: typeof meta.regularMarketDayHigh === 'number' ? Number(meta.regularMarketDayHigh.toFixed(2)) : undefined,
+    dayLow: typeof meta.regularMarketDayLow === 'number' ? Number(meta.regularMarketDayLow.toFixed(2)) : undefined,
+    fiftyTwoWeekHigh: typeof meta.fiftyTwoWeekHigh === 'number' ? Number(meta.fiftyTwoWeekHigh.toFixed(2)) : undefined,
+    fiftyTwoWeekLow: typeof meta.fiftyTwoWeekLow === 'number' ? Number(meta.fiftyTwoWeekLow.toFixed(2)) : undefined,
   };
 }
 
@@ -299,7 +345,10 @@ export default {
         if ('watchlist' in body) {
           const cleanList = sanitizeWatchlist(body.watchlist);
           if (!cleanList) {
-            return jsonResponse({ error: 'Invalid watchlist (1-25 valid .NS/.BO symbols required)' }, 400);
+            return jsonResponse(
+              { error: 'Invalid watchlist (1-25 valid NSE/BSE stocks, ETFs, or index symbols required)' },
+              400
+            );
           }
           nextWatchlist = cleanList;
           writes.push(env.STOCK_SPEAK_KV.put(KV_WATCHLIST_KEY, JSON.stringify(nextWatchlist)));
@@ -368,6 +417,56 @@ export default {
         return jsonResponse({ matches: [] });
       }
       const q = normalizeStockSearchQuery(rawQ);
+      const rawLower = rawQ.toLowerCase();
+
+      const matches: SearchMatch[] = [];
+      const seen = new Set<string>();
+      const pushMatch = (m: SearchMatch) => {
+        if (!seen.has(m.symbol)) {
+          seen.add(m.symbol);
+          matches.push(m);
+        }
+      };
+
+      // Surface local verified Indian indices & ETFs for broad queries like "nse", "bse", "etf", "nifty", "gold"
+      if (/^(nse|એનએસઈ|एनएसई)$/i.test(rawQ)) {
+        pushMatch({ symbol: '^NSEI', shortname: 'NIFTY 50 (NSE Index)', exchange: 'NSE', assetType: 'index' });
+        pushMatch({ symbol: 'NSE.BO', shortname: 'National Stock Exchange of India Ltd', exchange: 'BSE', assetType: 'stock' });
+      } else if (/^(bse|બીએસઈ|बीएसई)$/i.test(rawQ)) {
+        pushMatch({ symbol: '^BSESN', shortname: 'S&P BSE SENSEX (BSE Index)', exchange: 'BSE', assetType: 'index' });
+        pushMatch({ symbol: 'BSE.NS', shortname: 'BSE Limited', exchange: 'NSE', assetType: 'stock' });
+      } else if (/^(etf|etfs|ઈટીએફ|ईटीएफ)$/i.test(rawQ)) {
+        for (const etf of KNOWN_INDIAN_ETFS.slice(0, 6)) {
+          pushMatch({
+            symbol: etf.symbol,
+            shortname: `${etf.nameEn}${etf.tracks ? ` — ${etf.tracks}` : ''}`,
+            exchange: etf.exchange ?? 'NSE',
+            assetType: 'etf',
+          });
+        }
+      } else {
+        const allKnown = [...KNOWN_INDIAN_INDICES, ...KNOWN_INDIAN_ETFS];
+        for (const entry of allKnown) {
+          if (entry.pattern.test(rawQ)) {
+            pushMatch({
+              symbol: entry.symbol,
+              shortname: entry.nameEn,
+              exchange: entry.exchange ?? (entry.symbol.endsWith('.BO') ? 'BSE' : 'NSE'),
+              assetType: entry.assetType ?? inferAssetType(entry.symbol),
+            });
+          }
+        }
+        for (const entry of allKnown) {
+          if (entry.nameEn.toLowerCase().includes(rawLower)) {
+            pushMatch({
+              symbol: entry.symbol,
+              shortname: entry.nameEn,
+              exchange: entry.exchange ?? (entry.symbol.endsWith('.BO') ? 'BSE' : 'NSE'),
+              assetType: entry.assetType ?? inferAssetType(entry.symbol),
+            });
+          }
+        }
+      }
 
       const searchUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(q)}&quotesCount=15&newsCount=0`;
       const resp = await fetch(searchUrl, {
@@ -376,34 +475,37 @@ export default {
           Accept: 'application/json',
         },
       });
-      if (!resp.ok) {
+      if (!resp.ok && matches.length === 0) {
         return jsonResponse({ matches: [] }, 502);
       }
 
-      const data = (await resp.json()) as {
-        quotes?: Array<{
-          symbol?: string;
-          shortname?: string;
-          longname?: string;
-          exchange?: string;
-          quoteType?: string;
-        }>;
-      };
+      if (resp.ok) {
+        const data = (await resp.json()) as {
+          quotes?: Array<{
+            symbol?: string;
+            shortname?: string;
+            longname?: string;
+            exchange?: string;
+            quoteType?: string;
+          }>;
+        };
 
-      const matches: SearchMatch[] = [];
-      for (const item of data.quotes ?? []) {
-        const sym = (item.symbol ?? '').toUpperCase();
-        if (!TICKER_PATTERN.test(sym)) continue;
-        if (item.quoteType && item.quoteType !== 'EQUITY') continue;
-        matches.push({
-          symbol: sym,
-          shortname: item.shortname || item.longname || sym,
-          exchange: sym.endsWith('.BO') ? 'BSE' : 'NSE',
-        });
-        if (matches.length >= 6) break;
+        for (const item of data.quotes ?? []) {
+          const sym = (item.symbol ?? '').toUpperCase();
+          if (!TICKER_PATTERN.test(sym)) continue;
+          if (item.quoteType && !ALLOWED_SEARCH_QUOTE_TYPES.has(item.quoteType)) continue;
+          if (sym.startsWith('^') && item.exchange !== 'NSI' && item.exchange !== 'BSE') continue;
+          pushMatch({
+            symbol: sym,
+            shortname: item.shortname || item.longname || sym,
+            exchange: sym.endsWith('.BO') || item.exchange === 'BSE' ? 'BSE' : 'NSE',
+            assetType: inferAssetType(sym, item.quoteType),
+          });
+          if (matches.length >= 8) break;
+        }
       }
 
-      return jsonResponse({ matches }, 200, { 'Cache-Control': 'public, max-age=60' });
+      return jsonResponse({ matches: matches.slice(0, 8) }, 200, { 'Cache-Control': 'public, max-age=60' });
     }
 
     if (path === '/api/tts' && request.method === 'GET') {

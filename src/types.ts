@@ -1,4 +1,5 @@
 export type Exchange = 'NSE' | 'BSE';
+export type AssetType = 'stock' | 'etf' | 'index';
 export type Language = 'gu' | 'hi';
 export type PriceRounding = 'round' | 'exact_paise' | 'smart';
 export type TtsEngine = 'auto' | 'native_only' | 'edge_tts_only';
@@ -9,6 +10,7 @@ export interface StockItem {
   nameEn: string;
   nameGu: string;
   nameHi: string;
+  assetType?: AssetType;
 }
 
 export interface AppConfig {
@@ -41,12 +43,19 @@ export interface QuoteData {
   percentChange: number;
   marketTime: string;
   currency: string;
+  instrumentType?: string;
+  shortName?: string;
+  dayHigh?: number;
+  dayLow?: number;
+  fiftyTwoWeekHigh?: number;
+  fiftyTwoWeekLow?: number;
 }
 
 export interface SearchMatch {
   symbol: string;
   shortname: string;
   exchange: Exchange;
+  assetType?: AssetType;
 }
 
 export interface GeminiSessionInfo {

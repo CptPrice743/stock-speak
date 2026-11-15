@@ -2,6 +2,46 @@ import type { AppConfig, StockItem } from './types';
 
 export const DEFAULT_WATCHLIST: StockItem[] = [
   {
+    symbol: '^NSEI',
+    exchange: 'NSE',
+    assetType: 'index',
+    nameEn: 'NIFTY 50',
+    nameGu: 'નિફ્ટી ૫૦',
+    nameHi: 'निफ्टी 50',
+  },
+  {
+    symbol: '^BSESN',
+    exchange: 'BSE',
+    assetType: 'index',
+    nameEn: 'BSE SENSEX',
+    nameGu: 'બીએસઈ સેન્સેક્સ',
+    nameHi: 'बीएसई सेंसेक्स',
+  },
+  {
+    symbol: 'NSE.BO',
+    exchange: 'BSE',
+    assetType: 'stock',
+    nameEn: 'NSE (National Stock Exchange)',
+    nameGu: 'એનએસઈ શેર',
+    nameHi: 'एनएसई शेयर',
+  },
+  {
+    symbol: 'NIFTYBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    nameEn: 'Nifty BeES ETF',
+    nameGu: 'નિફ્ટી બીઝ ઈટીએફ',
+    nameHi: 'निफ्टी बीज़ ईटीएफ',
+  },
+  {
+    symbol: 'GOLDBEES.NS',
+    exchange: 'NSE',
+    assetType: 'etf',
+    nameEn: 'Gold BeES ETF',
+    nameGu: 'ગોલ્ડ બીઝ ઈટીએફ',
+    nameHi: 'गोल्ड बीज़ ईटीएफ',
+  },
+  {
     symbol: 'RELIANCE.NS',
     exchange: 'NSE',
     nameEn: 'Reliance Industries',

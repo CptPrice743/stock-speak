@@ -14,6 +14,7 @@ import {
   updateWatchlistRemote,
 } from './state';
 import type { Language, QuoteData } from './types';
+import { enableScreenWakeLock, ensureScreenWakeLock } from './wake-lock';
 
 function vibrateTap(): void {
   if ('vibrate' in navigator) {
@@ -67,6 +68,7 @@ export function mountDadaApp(root: HTMLElement): void {
 
   async function handleSpeakAll(): Promise<void> {
     vibrateTap();
+    void ensureScreenWakeLock();
     tapGeneration += 1;
     const myGen = tapGeneration;
 
@@ -108,6 +110,7 @@ export function mountDadaApp(root: HTMLElement): void {
 
   async function handleGeminiToggle(): Promise<void> {
     vibrateTap();
+    void ensureScreenWakeLock();
     speech.stop();
     speakingAllActive = false;
 
@@ -234,15 +237,15 @@ export function mountDadaApp(root: HTMLElement): void {
             (curLang === 'gu' ? '⏳ શોધું છું...' : '⏳ ढूँढ रहा हूँ...')
           : geminiStatus === 'listening'
             ? curLang === 'gu'
-              ? '🎙️ બોલો દાદા... (રોકવા દબાવો)'
-              : '🎙️ बोलें दादाजी... (रोकने दबाएं)'
+              ? '🎙️ બોલો... (રોકવા દબાવો)'
+              : '🎙️ बोलें... (रोकने दबाएं)'
             : geminiStatus === 'speaking'
               ? curLang === 'gu'
                 ? '🗣️ સાંભળો... (રોકવા દબાવો)'
                 : '🗣️ सुनें... (रोकने दबाएं)'
               : curLang === 'gu'
-                ? '🎙️ નવો શેર ઉમેરો / કાઢો'
-                : '🎙️ नया शेयर जोड़ें / हटाएं';
+                ? '🎙️ શેર, ETF કે માર્કેટ પૂછો'
+                : '🎙️ शेयर, ETF या मार्केट पूछें';
 
     root.innerHTML = `
       <div class="dada-shell">
@@ -322,5 +325,6 @@ export function mountDadaApp(root: HTMLElement): void {
     }
   }, 15_000);
 
+  enableScreenWakeLock();
   void bootSync();
 }

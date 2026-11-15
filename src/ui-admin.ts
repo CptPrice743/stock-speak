@@ -9,8 +9,22 @@ import {
   searchIndianStocks,
 } from './api';
 import { DEFAULT_CONFIG, DEFAULT_WATCHLIST } from './defaults';
+import { inferAssetType, KNOWN_INDIAN_STOCKS } from './indic-stocks';
 import { buildStockAnnouncement, SpeechController } from './speech';
-import type { AppConfig, SearchMatch, StockItem } from './types';
+import type { AppConfig, AssetType, SearchMatch, StockItem } from './types';
+
+const QUICK_ADD_SYMBOLS = [
+  '^NSEI',
+  '^BSESN',
+  '^NSEBANK',
+  'NSE.BO',
+  'BSE.NS',
+  'NIFTYBEES.NS',
+  'GOLDBEES.NS',
+  'SILVERBEES.NS',
+  'BANKBEES.NS',
+  'ITBEES.NS',
+];
 
 function escapeHtml(str: string): string {
   return str
@@ -108,12 +122,17 @@ export function mountAdminApp(root: HTMLElement): void {
     document.title = 'Caregiver Portal | Stock-Speak';
 
     const watchlistRows = watchlist
-      .map(
-        (s, idx) => `
+      .map((s, idx) => {
+        const assetType = s.assetType ?? inferAssetType(s.symbol);
+        const typeBadge =
+          assetType === 'index' ? '<span class="wl-badge wl-badge-index">INDEX</span>' :
+          assetType === 'etf' ? '<span class="wl-badge wl-badge-etf">ETF</span>' : '';
+        return `
         <li class="wl-row" data-idx="${idx}">
           <div class="wl-head">
             <strong>${escapeHtml(s.symbol)}</strong>
             <span class="wl-ex">${escapeHtml(s.exchange)}</span>
+            ${typeBadge}
             <div class="wl-actions">
               <button type="button" class="wl-move-up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''} aria-label="Move ${escapeHtml(s.nameEn)} up">▲</button>
               <button type="button" class="wl-move-down" data-idx="${idx}" ${idx === watchlist.length - 1 ? 'disabled' : ''} aria-label="Move ${escapeHtml(s.nameEn)} down">▼</button>
@@ -127,29 +146,42 @@ export function mountAdminApp(root: HTMLElement): void {
             </div>
           </div>
         </li>
-      `
-      )
+      `;
+      })
       .join('');
 
     const searchHtml = searchResults.length
       ? `<ul class="search-results">
           ${searchResults
-            .map(
-              (m) => `
+            .map((m) => {
+              const assetType = m.assetType ?? inferAssetType(m.symbol);
+              const badge =
+                assetType === 'index' ? '<span class="wl-badge wl-badge-index">INDEX</span>' :
+                assetType === 'etf' ? '<span class="wl-badge wl-badge-etf">ETF</span>' : '';
+              return `
             <li class="search-row">
               <div>
-                <strong>${escapeHtml(m.symbol)}</strong>
+                <strong>${escapeHtml(m.symbol)}</strong> ${badge}
                 <span class="admin-muted"> — ${escapeHtml(m.shortname)} (${m.exchange})</span>
               </div>
-              <button type="button" class="btn-add-match" data-symbol="${escapeHtml(m.symbol)}" data-name="${escapeHtml(m.shortname)}" data-ex="${m.exchange}">
+              <button type="button" class="btn-add-match" data-symbol="${escapeHtml(m.symbol)}" data-name="${escapeHtml(m.shortname)}" data-ex="${m.exchange}" data-type="${assetType}">
                 + Add
               </button>
             </li>
-          `
-            )
+          `;
+            })
             .join('')}
          </ul>`
       : '';
+
+    const quickAddChips = QUICK_ADD_SYMBOLS.map((sym) => {
+      const entry = KNOWN_INDIAN_STOCKS.find((k) => k.symbol === sym);
+      if (!entry) return '';
+      const alreadyAdded = watchlist.some((w) => w.symbol === sym);
+      return `<button type="button" class="quick-chip" data-symbol="${escapeHtml(sym)}" ${alreadyAdded ? 'disabled' : ''}>
+        ${alreadyAdded ? '✓' : '+'} ${escapeHtml(entry.nameEn)}
+      </button>`;
+    }).join('');
 
     root.innerHTML = `
       <div class="admin-shell">
@@ -183,15 +215,20 @@ export function mountAdminApp(root: HTMLElement): void {
           </section>
 
           <section class="admin-card">
-            <h2>2. Search & Add Indian Stock (NSE / BSE)</h2>
+            <h2>2. Search & Add Indian Stock, ETF, or Index (NSE / BSE)</h2>
+            <p class="admin-muted">Search any NSE/BSE company, ETF (e.g. Gold BeES, Nifty BeES, Silver BeES), or Market Index (NIFTY 50, BSE SENSEX).</p>
             <search>
               <form id="stock-search-form" class="search-form">
-                <label for="stock-search-input" class="visually-hidden">Search stock name or symbol</label>
-                <input id="stock-search-input" type="search" placeholder="Search e.g. Infosys, Tata Steel, Wipro..." minlength="2" required />
+                <label for="stock-search-input" class="visually-hidden">Search stock, ETF, or index</label>
+                <input id="stock-search-input" type="search" placeholder="Search e.g. NIFTY 50, SENSEX, Gold BeES, Infosys..." minlength="2" required />
                 <button type="submit" class="admin-btn-primary">Search</button>
               </form>
             </search>
             ${searchHtml}
+            <div class="quick-add-wrap">
+              <span class="admin-muted">Quick Add Indices & Popular ETFs:</span>
+              <div class="quick-chips">${quickAddChips}</div>
+            </div>
           </section>
 
           <section class="admin-card">
@@ -386,7 +423,7 @@ export function mountAdminApp(root: HTMLElement): void {
       if (!inp) return;
       try {
         searchResults = await searchIndianStocks(inp.value.trim());
-        statusMsg = searchResults.length ? '' : 'No matching NSE/BSE equity stocks found.';
+        statusMsg = searchResults.length ? '' : 'No matching NSE/BSE stocks, ETFs, or indices found.';
         render();
       } catch (err) {
         errorMsg = err instanceof Error ? err.message : 'Search failed';
@@ -399,12 +436,40 @@ export function mountAdminApp(root: HTMLElement): void {
         const sym = btn.dataset.symbol || '';
         const name = btn.dataset.name || sym;
         const ex = (btn.dataset.ex === 'BSE' ? 'BSE' : 'NSE') as 'NSE' | 'BSE';
+        const assetType = (btn.dataset.type as AssetType) || inferAssetType(sym);
+        const known = KNOWN_INDIAN_STOCKS.find((k) => k.symbol === sym);
         if (!watchlist.some((w) => w.symbol === sym)) {
-          watchlist.push({ symbol: sym, exchange: ex, nameEn: name, nameGu: name, nameHi: name });
+          watchlist.push({
+            symbol: sym,
+            exchange: known?.exchange ?? ex,
+            assetType: known?.assetType ?? assetType,
+            nameEn: known?.nameEn ?? name,
+            nameGu: known?.nameGu ?? name,
+            nameHi: known?.nameHi ?? name,
+          });
           statusMsg = `Added ${sym} to draft list. Click "Save All Settings" below to push to Dada's phone.`;
         }
         searchResults = [];
         render();
+      });
+    });
+
+    root.querySelectorAll<HTMLButtonElement>('.quick-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sym = btn.dataset.symbol || '';
+        const known = KNOWN_INDIAN_STOCKS.find((k) => k.symbol === sym);
+        if (known && !watchlist.some((w) => w.symbol === sym)) {
+          watchlist.push({
+            symbol: known.symbol,
+            exchange: known.exchange ?? (known.symbol.endsWith('.BO') || known.symbol === '^BSESN' ? 'BSE' : 'NSE'),
+            assetType: known.assetType ?? inferAssetType(known.symbol),
+            nameEn: known.nameEn,
+            nameGu: known.nameGu,
+            nameHi: known.nameHi,
+          });
+          statusMsg = `Added ${known.nameEn} (${known.symbol}) to draft list. Click "Save All Settings" below to sync.`;
+          render();
+        }
       });
     });
 

@@ -1,5 +1,17 @@
 import { fetchTtsAudioUrl } from './api';
+import { isIndexSymbol } from './indic-stocks';
 import type { AppConfig, Language, PriceRounding, QuoteData, StockItem } from './types';
+
+function formatIndexPoints(amount: number, lang: Language, mode: PriceRounding, forceExactIfSub1 = false): string {
+  const abs = Math.abs(amount);
+  const unit = lang === 'gu' ? 'પોઇન્ટ' : 'पॉइंट';
+  const useExact = mode === 'exact_paise' || (forceExactIfSub1 && abs > 0 && Math.round(abs) === 0);
+  if (!useExact) {
+    return `${Math.round(abs)} ${unit}`;
+  }
+  const formatted = Number.isInteger(abs) ? String(abs) : abs.toFixed(2).replace(/\.?0+$/, '');
+  return `${formatted} ${unit}`;
+}
 
 function formatMoney(amount: number, lang: Language, mode: PriceRounding, forceExactIfSub1 = false): string {
   const abs = Math.abs(amount);
@@ -32,11 +44,14 @@ export function buildStockAnnouncement(
 ): string {
   const lang = langOverride ?? config.language;
   const name = lang === 'gu' ? stock.nameGu : stock.nameHi;
-  const priceText = formatMoney(quote.regularMarketPrice, lang, config.priceRounding);
+  const isIndex =
+    stock.assetType === 'index' || quote.instrumentType === 'INDEX' || isIndexSymbol(stock.symbol);
+  const formatVal = isIndex ? formatIndexPoints : formatMoney;
+  const priceText = formatVal(quote.regularMarketPrice, lang, config.priceRounding);
 
   const isZero = Math.abs(quote.change) < 0.005;
   const isUp = quote.change > 0;
-  const changeText = formatMoney(quote.change, lang, config.priceRounding, true);
+  const changeText = formatVal(quote.change, lang, config.priceRounding, true);
 
   let sentence = '';
   if (lang === 'gu') {

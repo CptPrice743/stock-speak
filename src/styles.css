@@ -587,6 +587,55 @@ select:focus-visible {
   color: #ffd600;
 }
 
+.wl-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.wl-badge-index {
+  background: #003847;
+  color: #00e5ff;
+}
+
+.wl-badge-etf {
+  background: #0d2b18;
+  color: #00e676;
+}
+
+.quick-add-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-chip {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #464d5c;
+  background: #1a1f28;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.quick-chip:disabled {
+  opacity: 0.55;
+  cursor: default;
+  border-color: #2f5e3f;
+  color: #00e676;
+}
+
 .wl-actions {
   margin-left: auto;
   display: flex;
